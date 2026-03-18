@@ -1,0 +1,15 @@
+{
+    "recommendations": [
+        "YoavBls.pretty-ts-errors",
+        "ms-azuretools.vscode-docker",
+        "dbaeumer.vscode-eslint",
+        "crystal-spider.jsdoc-generator",
+        "esbenp.prettier-vscode",
+        "rvest.vs-code-prettier-eslint",
+        "ms-vscode-remote.remote-wsl",
+        "firsttris.vscode-jest-runner",
+        "kavod-io.vscode-jest-test-adapter",
+        "ms-vscode.vscode-typescript-next",
+        "PKief.material-icon-theme"
+    ]
+}
