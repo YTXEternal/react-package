@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { UxTable } from './components/UxTable';
 import type { UxTableColumn } from './components/UxTable/types';
 
