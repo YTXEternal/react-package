@@ -21,6 +21,23 @@ export interface UxTableColumn<RecordType> {
    * 列宽度
    */
   width?: number | string;
+  /**
+   * 是否允许调整列宽
+   */
+  resizable?: boolean;
+  /**
+   * 是否可编辑
+   */
+  editable?: boolean;
+  /**
+   * 排序函数，如果存在则表示该列支持排序。
+   * 返回 > 0 表示 a > b，< 0 表示 a < b，0 表示 a == b
+   */
+  sorter?: (a: RecordType, b: RecordType) => number;
+  /**
+   * 冻结列
+   */
+  fixed?: 'left' | 'right';
 }
 
 export interface UxTableProps<DataSource extends unknown[]> {
@@ -44,4 +61,8 @@ export interface UxTableProps<DataSource extends unknown[]> {
    * 样式
    */
   style?: CSSProperties;
+  /**
+   * 数据发生变化时的回调 (例如编辑单元格后)
+   */
+  onDataChange?: (newData: DataSource) => void;
 }
