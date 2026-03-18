@@ -33,7 +33,7 @@ const initialData: DataType[] = [
 function App() {
   const [data, setData] = useState(initialData);
 
-  const columns: UxTableColumn<DataType[]> = [
+  const columns: UxTableColumn<DataType>[] = [
     {
       title: 'Name',
       dataIndex: 'name',
