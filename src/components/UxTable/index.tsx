@@ -636,6 +636,7 @@ export const UxTable = <DataSource extends unknown[]>(props: UxTableProps<DataSo
                                             key={colKey}
                                             data-testid={`ux-table-cell-${rowIndex}-${colIndex}`}
                                             onMouseDown={(e) => {
+                                                // 当点击行号列时，强制标记 isLineNumberCol 为 true，同时记录起始选区信息
                                                 if (column.key === '_line_number_') {
                                                     handleCellMouseDown(e, rowIndex, colIndex, columns.length, true);
                                                 } else {
@@ -643,7 +644,11 @@ export const UxTable = <DataSource extends unknown[]>(props: UxTableProps<DataSo
                                                 }
                                             }}
                                             onMouseEnter={() => {
-                                                if (column.key === '_line_number_') {
+                                                // 判断当前是否是从行号列触发的拖拽，如果是，即使悬浮在其他列也应该只扩展行
+                                                // 如果起点的 col 也是 0（即行号列）且宽度跨越了所有列，说明处于整行选中模式
+                                                const isRowSelectionMode = selection && selection.start.col === 0 && selection.end.col === columns.length - 1;
+                                                
+                                                if (column.key === '_line_number_' || isRowSelectionMode) {
                                                     handleCellMouseEnter(rowIndex, colIndex, columns.length, true);
                                                 } else {
                                                     handleCellMouseEnter(rowIndex, colIndex, columns.length, false);
@@ -661,7 +666,9 @@ export const UxTable = <DataSource extends unknown[]>(props: UxTableProps<DataSo
                                                 transform: isFixed ? undefined : `translateX(${virtualCol.start}px)`,
                                                 width: `${virtualCol.size}px`,
                                                 height: '100%',
-                                                zIndex: isActive ? 4 : (isSelected ? 3 : (isFixed ? 2 : 1)),
+                                                // 确保固定列（isFixed）始终有最高的层级以覆盖普通滚动列
+                                                // 如果固定列被选中或激活，层级还要再提高，避免选框被相邻固定列遮挡
+                                                zIndex: isFixed ? (isActive ? 6 : (isSelected ? 5 : 4)) : (isActive ? 3 : (isSelected ? 2 : 1)),
                                                 backgroundColor: isSelected ? (isActive ? '#ffffff' : '#e6f7ff') : '#ffffff',
                                                 borderBottom: '1px solid #e8e8e8',
                                                 borderRight: '1px solid #e8e8e8',
