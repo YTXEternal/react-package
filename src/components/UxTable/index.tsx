@@ -7,6 +7,7 @@ import { useEditing } from './hooks/useEditing';
 import { useFixedColumns } from './hooks/useFixedColumns';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import styles from './styles.module.css';
+import { CELL_HEIGHT } from './constants';
 
 export const UxTable = <DataSource extends unknown[]>(props: UxTableProps<DataSource>) => {
     const { columns: propColumns, data: propData, rowKey, className, onDataChange, gridConfig } = props;
@@ -15,11 +16,9 @@ export const UxTable = <DataSource extends unknown[]>(props: UxTableProps<DataSo
     // 补齐 data 和 columns
     const { finalColumns, finalData } = React.useMemo(() => {
         const columns = [...propColumns];
-        const data = [...propData] as DataSource;
 
         if (gridConfig) {
-            const { rows, cols } = gridConfig;
-            
+            const { cols } = gridConfig;
             // 补齐列
             if (columns.length < cols) {
                 for (let i = columns.length; i < cols; i++) {
@@ -40,17 +39,29 @@ export const UxTable = <DataSource extends unknown[]>(props: UxTableProps<DataSo
                     } as unknown as UxTableColumn<DataSource[number]>);
                 }
             }
+        }
 
-            // 补齐行
-            if (data.length < rows) {
-                for (let i = data.length; i < rows; i++) {
-                    const newRow: Record<string, unknown> = {};
-                    if (typeof rowKey === 'string') {
-                        newRow[rowKey] = `_grid_row_${i}`;
-                    }
-                    data.push(newRow as DataSource[number]);
-                }
+        // 补齐行并填充 null
+        const targetRows = gridConfig ? Math.max(propData.length, gridConfig.rows) : propData.length;
+        const data = new Array(targetRows) as DataSource;
+
+        for (let i = 0; i < targetRows; i++) {
+            const existingRow = propData[i] as Record<string, unknown> | undefined;
+            const newRow: Record<string, unknown> = existingRow ? { ...existingRow } : {};
+
+            if (!existingRow && typeof rowKey === 'string') {
+                newRow[rowKey] = `_grid_row_${i}`;
             }
+
+            // 遍历所有列，确保 dataIndex 对应的值存在，为空则填充 null
+            columns.forEach((col) => {
+                const dataIndex = col.dataIndex as string;
+                if (newRow[dataIndex] === undefined || newRow[dataIndex] === '') {
+                    newRow[dataIndex] = null;
+                }
+            });
+
+            data[i] = newRow as DataSource[number];
         }
 
         return { finalColumns: columns, finalData: data };
@@ -59,21 +70,21 @@ export const UxTable = <DataSource extends unknown[]>(props: UxTableProps<DataSo
     // Hooks
     const { columns, handleResizeMouseDown } = useResizing(finalColumns);
     const { sortState, handleSort, sortedData } = useSorting(finalData, columns);
-    const { 
-        selection, 
-        setSelection, 
-        handleCellMouseDown, 
-        handleCellMouseEnter, 
-        isCellSelected, 
-        isCellActive 
+    const {
+        selection,
+        setSelection,
+        handleCellMouseDown,
+        handleCellMouseEnter,
+        isCellSelected,
+        isCellActive
     } = useSelection(tableRef);
-    const { 
-        editingCell, 
-        setEditingCell, 
-        editValue, 
-        setEditValue, 
-        startEditing, 
-        saveEdit 
+    const {
+        editingCell,
+        setEditingCell,
+        editValue,
+        setEditValue,
+        startEditing,
+        saveEdit
     } = useEditing(finalData, columns, sortedData, onDataChange);
     const fixedOffsets = useFixedColumns(columns);
 
@@ -92,11 +103,13 @@ export const UxTable = <DataSource extends unknown[]>(props: UxTableProps<DataSo
     const scrollbarRef = useRef<HTMLDivElement>(null);
     const isCancelingRef = useRef(false);
 
+
+
     // eslint-disable-next-line react-hooks/incompatible-library
     const rowVirtualizer = useVirtualizer({
         count: sortedData.length,
         getScrollElement: () => parentRef.current,
-        estimateSize: () => 40, // 默认行高
+        estimateSize: () => CELL_HEIGHT, // 默认行高
         overscan: 5,
     });
 
@@ -121,15 +134,15 @@ export const UxTable = <DataSource extends unknown[]>(props: UxTableProps<DataSo
         if (scrollbarRef.current && parentRef.current) {
             const main = parentRef.current;
             const scroll = scrollbarRef.current;
-            
+
             const mainMax = main.scrollWidth - main.clientWidth;
             const scrollMax = scroll.scrollWidth - scroll.clientWidth;
-            
+
             if (mainMax <= 0 || scrollMax <= 0) return;
-            
+
             const percentage = main.scrollLeft / mainMax;
             const targetScrollLeft = percentage * scrollMax;
-            
+
             if (Math.abs(scroll.scrollLeft - targetScrollLeft) > 1) {
                 scroll.scrollLeft = targetScrollLeft;
             }
@@ -140,10 +153,10 @@ export const UxTable = <DataSource extends unknown[]>(props: UxTableProps<DataSo
         if (scrollbarRef.current && parentRef.current) {
             const main = parentRef.current;
             const scroll = scrollbarRef.current;
-            
+
             const mainMax = main.scrollWidth - main.clientWidth;
             const scrollMax = scroll.scrollWidth - scroll.clientWidth;
-            
+
             if (mainMax <= 0 || scrollMax <= 0) return;
 
             const percentage = scroll.scrollLeft / scrollMax;
@@ -227,7 +240,7 @@ export const UxTable = <DataSource extends unknown[]>(props: UxTableProps<DataSo
         e.preventDefault();
         const text = e.clipboardData.getData('text/plain');
         const rows = text.split(/\r\n|\n|\r/).filter(row => row.length > 0);
-        
+
         const startRow = Math.min(selection.start.row, selection.end.row);
         const startCol = Math.min(selection.start.col, selection.end.col);
 
@@ -237,18 +250,18 @@ export const UxTable = <DataSource extends unknown[]>(props: UxTableProps<DataSo
         rows.forEach((rowStr, rIdx) => {
             const targetRowIdx = startRow + rIdx;
             if (targetRowIdx >= sortedData.length) return;
-            
+
             const cells = rowStr.split('\t');
             const record = sortedData[targetRowIdx];
             const originalIndex = finalData.indexOf(record);
             if (originalIndex === -1) return;
 
             const newRecord = { ...finalData[originalIndex] as object };
-            
+
             cells.forEach((cellStr, cIdx) => {
                 const targetColIdx = startCol + cIdx;
                 if (targetColIdx >= columns.length) return;
-                
+
                 const column = columns[targetColIdx];
                 if (column.editable !== false) {
                     (newRecord as Record<string, unknown>)[column.dataIndex as string] = cellStr;
@@ -263,20 +276,22 @@ export const UxTable = <DataSource extends unknown[]>(props: UxTableProps<DataSo
         }
     };
 
+    
+
     return (
-        <div 
+        <div
             className={`${styles['ux-table-wrapper']} ${className || ''}`}
-            style={{ 
-                display: 'flex', 
-                flexDirection: 'column', 
-                height: '100%', 
-                width: '100%', 
-                borderTop: '1px solid #e8e8e8', 
+            style={{
+                display: 'flex',
+                flexDirection: 'column',
+                height: 'auto',
+                width: 'auto',
+                borderTop: '1px solid #e8e8e8',
                 borderLeft: '1px solid #e8e8e8',
-                ...props.style 
+                ...props.style
             }}
         >
-            <div 
+            <div
                 ref={(node) => {
                     tableRef.current = node;
                     // eslint-disable-next-line @typescript-eslint/ban-ts-comment
@@ -288,243 +303,240 @@ export const UxTable = <DataSource extends unknown[]>(props: UxTableProps<DataSo
                 onPaste={handlePaste}
                 onScroll={handleMainScroll}
                 onWheel={handleWheel}
-                style={{ 
-                    overflowY: 'auto', 
+                style={{
+                    overflowY: 'auto',
                     overflowX: 'hidden', /* 隐藏横向滚动条，通过底部滚动条控制 */
-                    flex: 1,
-                    position: 'relative', 
+                    position: 'relative',
                     outline: 'none',
                     userSelect: 'none', // 防止拖拽时选中文本
                 }}
                 className={styles['ux-table-main']}
             >
                 <div style={{
-                    height: `${rowVirtualizer.getTotalSize()}px`,
+                    height: `${rowVirtualizer.getTotalSize() + (1* CELL_HEIGHT)}px`,
                     width: `${colVirtualizer.getTotalSize()}px`,
                     position: 'relative',
                 }}>
-                {/* 渲染表头 */}
-                <div style={{
-                    position: 'sticky',
-                    top: 0,
-                    zIndex: 3,
-                    display: 'flex',
-                    height: '40px', // 固定表头高度
-                }} data-testid="ux-table-header-row">
-                    {colVirtualizer.getVirtualItems().map((virtualCol) => {
-                        const index = virtualCol.index;
-                        const column = columns[index];
-                        const key = column.key || String(column.dataIndex) || index;
-                        const isFixed = column.fixed;
-                        const offset = fixedOffsets[index];
+                    {/* 渲染表头 */}
+                    <div style={{
+                        position: 'sticky',
+                        top: 0,
+                        zIndex: 3,
+                        display: 'flex',
+                        height: '40px', // 固定表头高度
+                    }} data-testid="ux-table-header-row">
+                        {colVirtualizer.getVirtualItems().map((virtualCol) => {
+                            const index = virtualCol.index;
+                            const column = columns[index];
+                            const key = column.key || String(column.dataIndex) || index;
+                            const isFixed = column.fixed;
+                            const offset = fixedOffsets[index];
 
+                            return (
+                                <div
+                                    key={key}
+                                    data-testid={`ux-table-header-cell-${index}`}
+                                    onClick={() => handleSort(index)}
+                                    style={{
+                                        position: isFixed ? 'sticky' : 'absolute',
+                                        left: isFixed === 'left' ? offset?.left : undefined,
+                                        right: isFixed === 'right' ? offset?.right : undefined,
+                                        transform: isFixed ? undefined : `translateX(${virtualCol.start}px)`,
+                                        width: `${virtualCol.size}px`,
+                                        height: '100%',
+                                        zIndex: isFixed ? 4 : 3,
+                                        backgroundColor: '#fafafa',
+                                        borderBottom: '1px solid #e8e8e8',
+                                        borderRight: '1px solid #e8e8e8',
+                                        boxShadow: offset?.isLastLeft ? '6px 0 6px -4px rgba(0,0,0,0.1)' : (offset?.isFirstRight ? '-6px 0 6px -4px rgba(0,0,0,0.1)' : 'none'),
+                                        padding: '8px 16px',
+                                        boxSizing: 'border-box',
+                                        textAlign: 'left',
+                                        userSelect: 'none',
+                                        cursor: column.sorter ? 'pointer' : 'default',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'space-between'
+                                    }}
+                                >
+                                    <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                        {column.title as React.ReactNode}
+                                    </span>
+                                    {column.sorter && (
+                                        <div style={{ display: 'flex', flexDirection: 'column', fontSize: '10px', marginLeft: '8px' }}>
+                                            <span style={{ color: sortState?.colIndex === index && sortState.order === 'asc' ? '#1890ff' : '#bfbfbf', lineHeight: '10px' }}>▲</span>
+                                            <span style={{ color: sortState?.colIndex === index && sortState.order === 'desc' ? '#1890ff' : '#bfbfbf', lineHeight: '10px' }}>▼</span>
+                                        </div>
+                                    )}
+                                    {column.resizable !== false && (
+                                        <div
+                                            data-testid={`ux-table-resizer-${index}`}
+                                            onMouseDown={(e) => handleResizeMouseDown(e, index)}
+                                            style={{
+                                                position: 'absolute',
+                                                right: 0,
+                                                top: 0,
+                                                bottom: 0,
+                                                width: '5px',
+                                                cursor: 'col-resize',
+                                                zIndex: 1
+                                            }}
+                                        />
+                                    )}
+                                </div>
+                            );
+                        })}
+                    </div>
+                    {/* 渲染数据体 */}
+                    {rowVirtualizer.getVirtualItems().map((virtualRow) => {
+                        const rowIndex = virtualRow.index;
+                        const record = sortedData[rowIndex];
+                        let rowKeyValue: React.Key = rowIndex;
+                        if (typeof rowKey === 'function') {
+                            rowKeyValue = rowKey(record);
+                        } else if (typeof rowKey === 'string') {
+                            rowKeyValue = (record as Record<string, unknown>)[rowKey] as React.Key;
+                        }
                         return (
                             <div
-                                key={key}
-                                data-testid={`ux-table-header-cell-${index}`}
-                                onClick={() => handleSort(index)}
+                                key={rowKeyValue}
+                                data-testid={`ux-table-row-${rowIndex}`}
                                 style={{
-                                    position: isFixed ? 'sticky' : 'absolute',
-                                    left: isFixed === 'left' ? offset?.left : undefined,
-                                    right: isFixed === 'right' ? offset?.right : undefined,
-                                    transform: isFixed ? undefined : `translateX(${virtualCol.start}px)`,
-                                    width: `${virtualCol.size}px`,
-                                    height: '100%',
-                                    zIndex: isFixed ? 4 : 3,
-                                    backgroundColor: '#fafafa',
-                                    borderBottom: '1px solid #e8e8e8',
-                                    borderRight: '1px solid #e8e8e8',
-                                    boxShadow: offset?.isLastLeft ? '6px 0 6px -4px rgba(0,0,0,0.1)' : (offset?.isFirstRight ? '-6px 0 6px -4px rgba(0,0,0,0.1)' : 'none'),
-                                    padding: '8px 16px',
-                                    boxSizing: 'border-box',
-                                    textAlign: 'left',
-                                    userSelect: 'none',
-                                    cursor: column.sorter ? 'pointer' : 'default',
+                                    position: 'absolute',
+                                    top: 0,
+                                    left: 0,
+                                    width: '100%',
+                                    height: `${virtualRow.size}px`,
+                                    transform: `translateY(${virtualRow.start + 40}px)`, // +40 为表头高度
                                     display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'space-between'
+                                    zIndex: rowVirtualizer.getVirtualItems().some(vCol => {
+                                        const rIdx = virtualRow.index;
+                                        const cIdx = vCol.index;
+                                        return isCellActive(rIdx, cIdx) || isCellSelected(rIdx, cIdx);
+                                    }) ? 2 : 1 // 提升包含选中单元格的行的层级
                                 }}
                             >
-                                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                    {column.title as React.ReactNode}
-                                </span>
-                                {column.sorter && (
-                                    <div style={{ display: 'flex', flexDirection: 'column', fontSize: '10px', marginLeft: '8px' }}>
-                                        <span style={{ color: sortState?.colIndex === index && sortState.order === 'asc' ? '#1890ff' : '#bfbfbf', lineHeight: '10px' }}>▲</span>
-                                        <span style={{ color: sortState?.colIndex === index && sortState.order === 'desc' ? '#1890ff' : '#bfbfbf', lineHeight: '10px' }}>▼</span>
-                                    </div>
-                                )}
-                                {column.resizable !== false && (
-                                    <div
-                                        data-testid={`ux-table-resizer-${index}`}
-                                        onMouseDown={(e) => handleResizeMouseDown(e, index)}
-                                        style={{
-                                            position: 'absolute',
-                                            right: 0,
-                                            top: 0,
-                                            bottom: 0,
-                                            width: '5px',
-                                            cursor: 'col-resize',
-                                            zIndex: 1
-                                        }}
-                                    />
-                                )}
+                                {colVirtualizer.getVirtualItems().map((virtualCol) => {
+                                    const colIndex = virtualCol.index;
+                                    const column = columns[colIndex];
+                                    const colKey = column.key || String(column.dataIndex) || colIndex;
+                                    const isFixed = column.fixed;
+                                    const offset = fixedOffsets[colIndex];
+                                    const isSelected = isCellSelected(rowIndex, colIndex);
+                                    const isActive = isCellActive(rowIndex, colIndex);
+                                    const isEditing = editingCell?.rowIndex === rowIndex && editingCell?.colIndex === colIndex;
+                                    const value = (record as Record<string, unknown>)[column.dataIndex as string];
+
+                                    return (
+                                        <div
+                                            key={colKey}
+                                            data-testid={`ux-table-cell-${rowIndex}-${colIndex}`}
+                                            onMouseDown={(e) => handleCellMouseDown(e, rowIndex, colIndex)}
+                                            onMouseEnter={() => handleCellMouseEnter(rowIndex, colIndex)}
+                                            onDoubleClick={() => startEditing(rowIndex, colIndex)}
+                                            style={{
+                                                position: isFixed ? 'sticky' : 'absolute',
+                                                left: isFixed === 'left' ? offset?.left : undefined,
+                                                right: isFixed === 'right' ? offset?.right : undefined,
+                                                transform: isFixed ? undefined : `translateX(${virtualCol.start}px)`,
+                                                width: `${virtualCol.size}px`,
+                                                height: '100%',
+                                                zIndex: isActive ? 4 : (isSelected ? 3 : (isFixed ? 2 : 1)),
+                                                backgroundColor: isSelected ? (isActive ? '#ffffff' : 'rgba(24, 144, 255, 0.1)') : '#ffffff',
+                                                // 统一使用 border 绘制基础网格
+                                                borderBottom: '1px solid #e8e8e8',
+                                                borderRight: '1px solid #e8e8e8',
+                                                // 使用 box-shadow 模拟边框
+                                                // 注意：为了实现类似 Excel 的外围边框，我们需要在四周分别绘制内阴影
+                                                // 这里通过调整 inset 大小确保边缘可见
+                                                boxShadow: [
+                                                    // 选中区域边界高亮 (仅当 isSelected 时才渲染外边框，取消 !isActive 限制，让包含 active 的边缘也能渲染选中边框)
+                                                    (isSelected && selectionBounds?.top === rowIndex) ? 'inset 0 2px 0 0 #1890ff' : 'none',
+                                                    (isSelected && selectionBounds?.bottom === rowIndex) ? 'inset 0 -2px 0 0 #1890ff' : 'none',
+                                                    (isSelected && selectionBounds?.left === colIndex) ? 'inset 2px 0 0 0 #1890ff' : 'none',
+                                                    (isSelected && selectionBounds?.right === colIndex) ? 'inset -2px 0 0 0 #1890ff' : 'none',
+                                                    // active 单元格的内边框 (如果它也在边缘，会被上面的 2px 覆盖或叠加，这里保持为 1px 以示区别，或者不加)
+                                                    // 实际上 Excel 中 active 单元格没有单独的蓝框，除非它不是多选区。
+                                                    // 但为了明确当前光标，我们给它一个稍弱的内阴影，或者依赖 backgroundColor: #fff 来区分
+                                                    // 修正：如果只是单个单元格选中，它应该有 2px 边框；如果是多选区，active 单元格不需要四周的边框，只需要背景色为白即可
+                                                    (isActive && (!selectionBounds || (selectionBounds.top === selectionBounds.bottom && selectionBounds.left === selectionBounds.right))) ? 'inset 0 0 0 2px #1890ff' : 'none',
+                                                    // 固定列阴影
+                                                    offset?.isLastLeft ? '6px 0 6px -4px rgba(0,0,0,0.1)' : 'none',
+                                                    offset?.isFirstRight ? '-6px 0 6px -4px rgba(0,0,0,0.1)' : 'none'
+                                                ].filter(s => s !== 'none').join(', ') || 'none',
+                                                padding: isEditing ? 0 : '8px 16px',
+                                                boxSizing: 'border-box',
+                                                overflow: isEditing ? 'visible' : 'hidden',
+                                                textOverflow: 'ellipsis',
+                                                whiteSpace: 'nowrap',
+                                                cursor: 'cell',
+                                                display: 'flex',
+                                                alignItems: 'center'
+                                            }}
+                                        >
+                                            {isEditing ? (
+                                                <input
+                                                    autoFocus
+                                                    value={editValue}
+                                                    onChange={(e) => setEditValue(e.target.value)}
+                                                    onBlur={() => {
+                                                        if (!isCancelingRef.current) {
+                                                            saveEdit();
+                                                        }
+                                                        isCancelingRef.current = false;
+                                                    }}
+                                                    onKeyDown={(e) => {
+                                                        e.stopPropagation();
+                                                        if (e.key === 'Enter') {
+                                                            saveEdit();
+                                                        } else if (e.key === 'Escape') {
+                                                            isCancelingRef.current = true;
+                                                            setEditingCell(null);
+                                                            tableRef.current?.focus();
+                                                        }
+                                                    }}
+                                                    style={{
+                                                        width: '100%',
+                                                        height: '100%',
+                                                        boxSizing: 'border-box',
+                                                        border: '2px solid #1890ff',
+                                                        padding: '6px 14px',
+                                                        outline: 'none',
+                                                        fontFamily: 'inherit',
+                                                        fontSize: 'inherit'
+                                                    }}
+                                                />
+                                            ) : (
+                                                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', width: '100%' }}>
+                                                    {column.render ? column.render(value, record, rowIndex) : (value as React.ReactNode)}
+                                                </span>
+                                            )}
+                                        </div>
+                                    );
+                                })}
                             </div>
                         );
                     })}
                 </div>
+            </div>
 
-                {/* 渲染数据体 */}
-                {rowVirtualizer.getVirtualItems().map((virtualRow) => {
-                    const rowIndex = virtualRow.index;
-                    const record = sortedData[rowIndex];
-                    let rowKeyValue: React.Key = rowIndex;
-                    if (typeof rowKey === 'function') {
-                        rowKeyValue = rowKey(record);
-                    } else if (typeof rowKey === 'string') {
-                        rowKeyValue = (record as Record<string, unknown>)[rowKey] as React.Key;
-                    }
+            {/* 底部标签页与滚动条区域 */}
+            <div className={styles['ux-table-bottom-bar']}>
+                {/* 左侧：标签页 (暂作示例) */}
+                <div className={styles['ux-table-tabs']}>
+                    <div className={`${styles['ux-table-tab']} ${styles['active']}`}>Sheet1</div>
+                    <div className={styles['ux-table-tab']}>+</div>
+                </div>
 
-                    return (
-                        <div
-                            key={rowKeyValue}
-                            data-testid={`ux-table-row-${rowIndex}`}
-                            style={{
-                                position: 'absolute',
-                                top: 0,
-                                left: 0,
-                                width: '100%',
-                                height: `${virtualRow.size}px`,
-                                transform: `translateY(${virtualRow.start + 40}px)`, // +40 为表头高度
-                                display: 'flex',
-                                zIndex: rowVirtualizer.getVirtualItems().some(vCol => {
-                                    const rIdx = virtualRow.index;
-                                    const cIdx = vCol.index;
-                                    return isCellActive(rIdx, cIdx) || isCellSelected(rIdx, cIdx);
-                                }) ? 2 : 1 // 提升包含选中单元格的行的层级
-                            }}
-                        >
-                            {colVirtualizer.getVirtualItems().map((virtualCol) => {
-                                const colIndex = virtualCol.index;
-                                const column = columns[colIndex];
-                                const colKey = column.key || String(column.dataIndex) || colIndex;
-                                const isFixed = column.fixed;
-                                const offset = fixedOffsets[colIndex];
-                                const isSelected = isCellSelected(rowIndex, colIndex);
-                                const isActive = isCellActive(rowIndex, colIndex);
-                                const isEditing = editingCell?.rowIndex === rowIndex && editingCell?.colIndex === colIndex;
-                                const value = (record as Record<string, unknown>)[column.dataIndex as string];
-
-                                return (
-                                    <div
-                                        key={colKey}
-                                        data-testid={`ux-table-cell-${rowIndex}-${colIndex}`}
-                                        onMouseDown={(e) => handleCellMouseDown(e, rowIndex, colIndex)}
-                                        onMouseEnter={() => handleCellMouseEnter(rowIndex, colIndex)}
-                                        onDoubleClick={() => startEditing(rowIndex, colIndex)}
-                                        style={{
-                                            position: isFixed ? 'sticky' : 'absolute',
-                                            left: isFixed === 'left' ? offset?.left : undefined,
-                                            right: isFixed === 'right' ? offset?.right : undefined,
-                                            transform: isFixed ? undefined : `translateX(${virtualCol.start}px)`,
-                                            width: `${virtualCol.size}px`,
-                                            height: '100%',
-                                            zIndex: isActive ? 4 : (isSelected ? 3 : (isFixed ? 2 : 1)),
-                                            backgroundColor: isSelected ? (isActive ? '#ffffff' : 'rgba(24, 144, 255, 0.1)') : '#ffffff',
-                                            // 统一使用 border 绘制基础网格
-                                            borderBottom: '1px solid #e8e8e8',
-                                            borderRight: '1px solid #e8e8e8',
-                                            // 使用 box-shadow 模拟边框
-                                            // 注意：为了实现类似 Excel 的外围边框，我们需要在四周分别绘制内阴影
-                                            // 这里通过调整 inset 大小确保边缘可见
-                                            boxShadow: [
-                                                // 选中区域边界高亮 (仅当 isSelected 时才渲染外边框，取消 !isActive 限制，让包含 active 的边缘也能渲染选中边框)
-                                                (isSelected && selectionBounds?.top === rowIndex) ? 'inset 0 2px 0 0 #1890ff' : 'none',
-                                                (isSelected && selectionBounds?.bottom === rowIndex) ? 'inset 0 -2px 0 0 #1890ff' : 'none',
-                                                (isSelected && selectionBounds?.left === colIndex) ? 'inset 2px 0 0 0 #1890ff' : 'none',
-                                                (isSelected && selectionBounds?.right === colIndex) ? 'inset -2px 0 0 0 #1890ff' : 'none',
-                                                // active 单元格的内边框 (如果它也在边缘，会被上面的 2px 覆盖或叠加，这里保持为 1px 以示区别，或者不加)
-                                                // 实际上 Excel 中 active 单元格没有单独的蓝框，除非它不是多选区。
-                                                // 但为了明确当前光标，我们给它一个稍弱的内阴影，或者依赖 backgroundColor: #fff 来区分
-                                                // 修正：如果只是单个单元格选中，它应该有 2px 边框；如果是多选区，active 单元格不需要四周的边框，只需要背景色为白即可
-                                                (isActive && (!selectionBounds || (selectionBounds.top === selectionBounds.bottom && selectionBounds.left === selectionBounds.right))) ? 'inset 0 0 0 2px #1890ff' : 'none',
-                                                // 固定列阴影
-                                                offset?.isLastLeft ? '6px 0 6px -4px rgba(0,0,0,0.1)' : 'none',
-                                                offset?.isFirstRight ? '-6px 0 6px -4px rgba(0,0,0,0.1)' : 'none'
-                                            ].filter(s => s !== 'none').join(', ') || 'none',
-                                            padding: isEditing ? 0 : '8px 16px',
-                                            boxSizing: 'border-box',
-                                            overflow: isEditing ? 'visible' : 'hidden',
-                                            textOverflow: 'ellipsis',
-                                            whiteSpace: 'nowrap',
-                                            cursor: 'cell',
-                                            display: 'flex',
-                                            alignItems: 'center'
-                                        }}
-                                    >
-                                        {isEditing ? (
-                                            <input
-                                                autoFocus
-                                                value={editValue}
-                                                onChange={(e) => setEditValue(e.target.value)}
-                                                onBlur={() => {
-                                                    if (!isCancelingRef.current) {
-                                                        saveEdit();
-                                                    }
-                                                    isCancelingRef.current = false;
-                                                }}
-                                                onKeyDown={(e) => {
-                                                    e.stopPropagation();
-                                                    if (e.key === 'Enter') {
-                                                        saveEdit();
-                                                    } else if (e.key === 'Escape') {
-                                                        isCancelingRef.current = true;
-                                                        setEditingCell(null);
-                                                        tableRef.current?.focus();
-                                                    }
-                                                }}
-                                                style={{
-                                                    width: '100%',
-                                                    height: '100%',
-                                                    boxSizing: 'border-box',
-                                                    border: '2px solid #1890ff',
-                                                    padding: '6px 14px',
-                                                    outline: 'none',
-                                                    fontFamily: 'inherit',
-                                                    fontSize: 'inherit'
-                                                }}
-                                            />
-                                        ) : (
-                                            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', width: '100%' }}>
-                                                {column.render ? column.render(value, record, rowIndex) : (value as React.ReactNode)}
-                                            </span>
-                                        )}
-                                    </div>
-                                );
-                            })}
-                        </div>
-                    );
-                })}
+                {/* 右侧：同步横向滚动条 */}
+                <div
+                    ref={scrollbarRef}
+                    className={styles['ux-table-scrollbar-x']}
+                    onScroll={handleBottomScroll}
+                >
+                    <div style={{ width: `${colVirtualizer.getTotalSize()}px`, height: '1px' }} />
+                </div>
             </div>
         </div>
-
-        {/* 底部标签页与滚动条区域 */}
-        <div className={styles['ux-table-bottom-bar']}>
-            {/* 左侧：标签页 (暂作示例) */}
-            <div className={styles['ux-table-tabs']}>
-                <div className={`${styles['ux-table-tab']} ${styles['active']}`}>Sheet1</div>
-                <div className={styles['ux-table-tab']}>+</div>
-            </div>
-            
-            {/* 右侧：同步横向滚动条 */}
-            <div 
-                ref={scrollbarRef}
-                className={styles['ux-table-scrollbar-x']}
-                onScroll={handleBottomScroll}
-            >
-                <div style={{ width: `${colVirtualizer.getTotalSize()}px`, height: '1px' }} />
-            </div>
-        </div>
-    </div>
     );
 };

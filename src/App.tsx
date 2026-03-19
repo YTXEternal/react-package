@@ -4,21 +4,8 @@ import type { UxTableColumn } from './components/UxTable/types';
 
 interface DataType {
   key: string;
-  [key: string]: string | number;
+  [key: string]: string | number | null;
 }
-
-// 生成大规模数据
-const generateData = (rows: number, cols: number): DataType[] => {
-  const data: DataType[] = [];
-  for (let i = 0; i < rows; i++) {
-    const item: DataType = { key: `${i}` };
-    for (let j = 0; j < cols; j++) {
-      item[`col_${j}`] = `数据 ${i}-${j}`;
-    }
-    data.push(item);
-  }
-  return data;
-};
 
 // 生成大规模列定义
 const generateColumns = (cols: number): UxTableColumn<DataType>[] => {
@@ -32,7 +19,16 @@ const generateColumns = (cols: number): UxTableColumn<DataType>[] => {
     width: 150,
     fixed: 'left',
     editable: true,
-    sorter: (a, b) => String(a.col_0).localeCompare(String(b.col_0))
+    sorter: true
+  });
+
+  columns.push({
+    title: '数字列',
+    dataIndex: 'num_col',
+    key: 'num_col',
+    width: 120,
+    editable: true,
+    sorter: true
   });
 
   for (let i = 1; i < cols; i++) {
@@ -48,6 +44,21 @@ const generateColumns = (cols: number): UxTableColumn<DataType>[] => {
   return columns;
 };
 
+// 生成大规模数据
+const generateData = (rows: number, cols: number): DataType[] => {
+  const data: DataType[] = [];
+  for (let i = 0; i < rows; i++) {
+    const item: DataType = { key: `${i}` };
+    for (let j = 0; j < cols; j++) {
+      item[`col_${j}`] = `数据 ${i}-${j}`;
+    }
+    // 添加数字列数据，故意打乱顺序并混入 null
+    item['num_col'] = i % 3 === 0 ? null : (rows - i) * 10;
+    data.push(item);
+  }
+  return data;
+};
+
 function App() {
   // 使用 useMemo 缓存初始数据，避免重复生成
   const initialData = useMemo(() => generateData(6, 20), []);
@@ -55,15 +66,20 @@ function App() {
 
   const [data, setData] = useState(initialData);
 
+  const onDataChange = (newData: DataType[]) => {
+    console.log('newData',newData);
+    setData(newData);
+  };
+
   return (
-    <div style={{ padding: 20, height: '100vh', display: 'flex', flexDirection: 'column' }}>
-      <h1>UxTable 网格画布演示</h1>
+    <div style={{ padding: 20, height: '500px', display: 'flex', flexDirection: 'column' }}>
+      <h1>UxTable</h1>
       <div style={{ flex: 1, overflow: 'hidden' }}>
         <UxTable<DataType[]> 
           columns={initialColumns} 
           data={data} 
           rowKey="key"
-          onDataChange={setData}
+          onDataChange={onDataChange}
           gridConfig={{ rows: 20, cols: 20 }}
           style={{ height: '100%' }}
         />

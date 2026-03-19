@@ -1,5 +1,6 @@
 import { useState, useMemo } from 'react';
 import type { UxTableColumn } from '../types';
+import { compareValues } from '../utils/sort';
 
 export interface SortState {
     colIndex: number;
@@ -32,7 +33,24 @@ export const useSorting = <DataSource extends unknown[]>(
         
         const dataCopy = [...data] as DataSource;
         dataCopy.sort((a, b) => {
-            const result = column.sorter!(a as DataSource[number], b as DataSource[number]);
+            const valA = (a as Record<string, unknown>)[column.dataIndex as string];
+            const valB = (b as Record<string, unknown>)[column.dataIndex as string];
+            
+            // 提取空值判断：空值（null/undefined/空字符串）始终置于末尾
+            const isNullA = valA === null || valA === undefined || valA === '';
+            const isNullB = valB === null || valB === undefined || valB === '';
+
+            if (isNullA && isNullB) return 0;
+            if (isNullA) return 1;
+            if (isNullB) return -1;
+
+            let result = 0;
+            if (typeof column.sorter === 'function') {
+                result = column.sorter(a as DataSource[number], b as DataSource[number]);
+            } else {
+                result = compareValues(valA, valB);
+            }
+            
             return sortState.order === 'asc' ? result : -result;
         });
         return dataCopy;

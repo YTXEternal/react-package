@@ -30,10 +30,10 @@ export interface UxTableColumn<RecordType> {
    */
   editable?: boolean;
   /**
-   * 排序函数，如果存在则表示该列支持排序。
+   * 排序函数或布尔值，为 true 时使用内置的通用排序（支持 string | number | null），为函数时使用自定义排序
    * 返回 > 0 表示 a > b，< 0 表示 a < b，0 表示 a == b
    */
-  sorter?: (a: RecordType, b: RecordType) => number;
+  sorter?: boolean | ((a: RecordType, b: RecordType) => number);
   /**
    * 冻结列
    */

@@ -57,4 +57,16 @@ describe('UxTable Component', () => {
     expect(screen.getByText('30')).toBeInTheDocument();
     expect(screen.getByText('25')).toBeInTheDocument();
   });
+
+  it('pads data to match gridConfig and fills missing values with null', () => {
+    const gridConfig = { rows: 3, cols: 3 };
+    const testData = [{ key: '1', name: 'John Doe' }] as DataType[];
+    render(<UxTable columns={columns} data={testData} rowKey="key" gridConfig={gridConfig} />);
+    
+    // The test mock virtualizer renders all items
+    // Should render 3 rows. First row has Name, Age(null), Col_2(null)
+    // We can't directly check the internal state easily here, but we can verify it doesn't crash 
+    // and correctly renders the header for the dynamically added 3rd column "C".
+    expect(screen.getByText('C')).toBeInTheDocument();
+  });
 });
