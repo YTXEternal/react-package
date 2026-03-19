@@ -5,6 +5,7 @@ import { useSorting } from './hooks/useSorting';
 import { useSelection } from './hooks/useSelection';
 import { useEditing } from './hooks/useEditing';
 import { useFixedColumns } from './hooks/useFixedColumns';
+import { useClipboard } from './hooks/useClipboard';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import styles from './styles.module.css';
 import { CELL_HEIGHT } from './constants';
@@ -157,6 +158,7 @@ export const UxTable = <DataSource extends unknown[]>(props: UxTableProps<DataSo
         saveEdit
     } = useEditing(finalData, columns, sortedData, onDataChange);
     const fixedOffsets = useFixedColumns(columns);
+    const { copyToClipboard } = useClipboard();
 
     useImperativeHandle(ref, () => ({
         focusArea: (area: { row: [number, number]; cols: [number, number] }) => {
@@ -294,7 +296,7 @@ export const UxTable = <DataSource extends unknown[]>(props: UxTableProps<DataSo
             }
             rows.push(rowData.join('\t'));
         }
-        navigator.clipboard.writeText(rows.join('\n'));
+        copyToClipboard(rows.join('\n'));
     };
 
     const handlePaste = (e: React.ClipboardEvent) => {
