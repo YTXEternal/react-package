@@ -160,6 +160,14 @@ export const UxTable = <DataSource extends unknown[]>(props: UxTableProps<DataSo
     const fixedOffsets = useFixedColumns(columns);
     const { copyToClipboard } = useClipboard();
 
+    const [copiedBounds, setCopiedBounds] = React.useState<{top: number, bottom: number, left: number, right: number} | null>(null);
+
+    React.useEffect(() => {
+        if (editingCell) {
+            setCopiedBounds(null);
+        }
+    }, [editingCell]);
+
     useImperativeHandle(ref, () => ({
         focusArea: (area: { row: [number, number]; cols: [number, number] }) => {
             setSelection({
@@ -259,6 +267,13 @@ export const UxTable = <DataSource extends unknown[]>(props: UxTableProps<DataSo
 
     // Keyboard & Paste Handlers
     const handleKeyDown = (e: React.KeyboardEvent) => {
+        if (e.key === 'Escape') {
+            if (copiedBounds) {
+                setCopiedBounds(null);
+                e.preventDefault();
+                return;
+            }
+        }
         if (editingCell || !selection) return; // 卫语句：正在编辑或没有选区时直接返回
 
         const { start } = selection;
@@ -286,6 +301,8 @@ export const UxTable = <DataSource extends unknown[]>(props: UxTableProps<DataSo
         const c1 = Math.min(selection.start.col, selection.end.col);
         const c2 = Math.max(selection.start.col, selection.end.col);
 
+        setCopiedBounds({ top: r1, bottom: r2, left: c1, right: c2 });
+
         const rows = [];
         for (let i = r1; i <= r2; i++) {
             const rowData = [];
@@ -301,7 +318,7 @@ export const UxTable = <DataSource extends unknown[]>(props: UxTableProps<DataSo
 
     const handlePaste = (e: React.ClipboardEvent) => {
         if (!selection || !onDataChange) return; // 卫语句：无选区或无回调时返回
-        
+        setCopiedBounds(null);
         e.preventDefault();
         const text = e.clipboardData.getData('text/plain');
         if (!text) return; // 卫语句：无粘贴内容时返回
@@ -506,6 +523,14 @@ export const UxTable = <DataSource extends unknown[]>(props: UxTableProps<DataSo
                                     const isEditing = editingCell?.rowIndex === rowIndex && editingCell?.colIndex === colIndex;
                                     const value = (record as Record<string, unknown>)[column.dataIndex as string];
 
+                                    const isCopied = copiedBounds && 
+                                        rowIndex >= copiedBounds.top && rowIndex <= copiedBounds.bottom && 
+                                        colIndex >= copiedBounds.left && colIndex <= copiedBounds.right;
+                                    const isCopiedTop = isCopied && rowIndex === copiedBounds.top;
+                                    const isCopiedBottom = isCopied && rowIndex === copiedBounds.bottom;
+                                    const isCopiedLeft = isCopied && colIndex === copiedBounds.left;
+                                    const isCopiedRight = isCopied && colIndex === copiedBounds.right;
+
                                     return (
                                         <div
                                             key={colKey}
@@ -543,6 +568,10 @@ export const UxTable = <DataSource extends unknown[]>(props: UxTableProps<DataSo
                                                 alignItems: 'center'
                                             }}
                                         >
+                                            {isCopiedTop && <div className={styles['marching-ants-top']} />}
+                                            {isCopiedBottom && <div className={styles['marching-ants-bottom']} />}
+                                            {isCopiedLeft && <div className={styles['marching-ants-left']} />}
+                                            {isCopiedRight && <div className={styles['marching-ants-right']} />}
                                             {isEditing ? (
                                                 <input
                                                     autoFocus

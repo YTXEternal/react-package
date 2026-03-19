@@ -109,3 +109,53 @@
 .ux-table-scrollbar-x::-webkit-scrollbar {
   height: 12px; /* 横向滚动条高度，略大一些方便点击 */
 }
+
+/* 蚂蚁线动画（复制功能） */
+@keyframes march-x {
+  0% { background-position: 0 0; }
+  100% { background-position: 8px 0; }
+}
+@keyframes march-x-reverse {
+  0% { background-position: 0 0; }
+  100% { background-position: -8px 0; }
+}
+@keyframes march-y {
+  0% { background-position: 0 0; }
+  100% { background-position: 0 8px; }
+}
+@keyframes march-y-reverse {
+  0% { background-position: 0 0; }
+  100% { background-position: 0 -8px; }
+}
+
+.marching-ants-top {
+  position: absolute;
+  top: 0; left: 0; right: 0; height: 2px;
+  background: repeating-linear-gradient(to right, #1890ff 0, #1890ff 4px, #fff 4px, #fff 8px);
+  animation: march-x 0.5s linear infinite;
+  z-index: 5;
+}
+
+.marching-ants-bottom {
+  position: absolute;
+  bottom: 0; left: 0; right: 0; height: 2px;
+  background: repeating-linear-gradient(to right, #1890ff 0, #1890ff 4px, #fff 4px, #fff 8px);
+  animation: march-x-reverse 0.5s linear infinite;
+  z-index: 5;
+}
+
+.marching-ants-left {
+  position: absolute;
+  top: 0; bottom: 0; left: 0; width: 2px;
+  background: repeating-linear-gradient(to bottom, #1890ff 0, #1890ff 4px, #fff 4px, #fff 8px);
+  animation: march-y-reverse 0.5s linear infinite;
+  z-index: 5;
+}
+
+.marching-ants-right {
+  position: absolute;
+  top: 0; bottom: 0; right: 0; width: 2px;
+  background: repeating-linear-gradient(to bottom, #1890ff 0, #1890ff 4px, #fff 4px, #fff 8px);
+  animation: march-y 0.5s linear infinite;
+  z-index: 5;
+}
