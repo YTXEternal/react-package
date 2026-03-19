@@ -1,4 +1,4 @@
-import React, { useRef } from 'react';
+import React, { useRef, useImperativeHandle } from 'react';
 import type { UxTableProps, UxTableColumn } from './types';
 import { useResizing } from './hooks/useResizing';
 import { useSorting } from './hooks/useSorting';
@@ -9,8 +9,16 @@ import { useVirtualizer } from '@tanstack/react-virtual';
 import styles from './styles.module.css';
 import { CELL_HEIGHT } from './constants';
 
+
+/**
+ * UxTable 组件
+ *
+ * @template {unknown[]} DataSource 
+ * @param {UxTableProps<DataSource>} props 组件的属性，包含列配置、数据数组、行键、类名、数据变化回调、网格配置等
+ * @returns {*} 
+ */
 export const UxTable = <DataSource extends unknown[]>(props: UxTableProps<DataSource>) => {
-    const { columns: propColumns, data: propData, rowKey, className, onDataChange, gridConfig } = props;
+    const { columns: propColumns, data: propData, rowKey, className, onDataChange, gridConfig, ref } = props;
     const tableRef = useRef<HTMLDivElement>(null);
 
     // 补齐 data 和 columns
@@ -87,6 +95,16 @@ export const UxTable = <DataSource extends unknown[]>(props: UxTableProps<DataSo
         saveEdit
     } = useEditing(finalData, columns, sortedData, onDataChange);
     const fixedOffsets = useFixedColumns(columns);
+
+    useImperativeHandle(ref, () => ({
+        focusArea: (area: { row: [number, number]; cols: [number, number] }) => {
+            setSelection({
+                start: { row: area.row[0], col: area.cols[0] },
+                end: { row: area.row[1], col: area.cols[1] }
+            });
+            tableRef.current?.focus();
+        }
+    }), [setSelection]);
 
     // 选区边界计算
     const selectionBounds = React.useMemo(() => {
@@ -240,16 +258,19 @@ export const UxTable = <DataSource extends unknown[]>(props: UxTableProps<DataSo
         e.preventDefault();
         const text = e.clipboardData.getData('text/plain');
         const rows = text.split(/\r\n|\n|\r/).filter(row => row.length > 0);
-
         const startRow = Math.min(selection.start.row, selection.end.row);
         const startCol = Math.min(selection.start.col, selection.end.col);
-
         const newData = [...finalData] as DataSource;
         let changed = false;
+
+        let maxRowIdx = startRow;
+        let maxColIdx = startCol;
 
         rows.forEach((rowStr, rIdx) => {
             const targetRowIdx = startRow + rIdx;
             if (targetRowIdx >= sortedData.length) return;
+
+            maxRowIdx = Math.max(maxRowIdx, targetRowIdx);
 
             const cells = rowStr.split('\t');
             const record = sortedData[targetRowIdx];
@@ -261,6 +282,8 @@ export const UxTable = <DataSource extends unknown[]>(props: UxTableProps<DataSo
             cells.forEach((cellStr, cIdx) => {
                 const targetColIdx = startCol + cIdx;
                 if (targetColIdx >= columns.length) return;
+
+                maxColIdx = Math.max(maxColIdx, targetColIdx);
 
                 const column = columns[targetColIdx];
                 if (column.editable !== false) {
@@ -274,6 +297,12 @@ export const UxTable = <DataSource extends unknown[]>(props: UxTableProps<DataSo
         if (changed) {
             onDataChange(newData);
         }
+
+        setSelection({
+            start: { row: startRow, col: startCol },
+            end: { row: maxRowIdx, col: maxColIdx }
+        });
+        tableRef.current?.focus();
     };
 
     
@@ -524,8 +553,8 @@ export const UxTable = <DataSource extends unknown[]>(props: UxTableProps<DataSo
             <div className={styles['ux-table-bottom-bar']}>
                 {/* 左侧：标签页 (暂作示例) */}
                 <div className={styles['ux-table-tabs']}>
-                    <div className={`${styles['ux-table-tab']} ${styles['active']}`}>Sheet1</div>
-                    <div className={styles['ux-table-tab']}>+</div>
+                    {/* <div className={`${styles['ux-table-tab']} ${styles['active']}`}>Sheet1</div> */}
+                    {/* <div className={styles['ux-table-tab']}>+</div> */}
                 </div>
 
                 {/* 右侧：同步横向滚动条 */}

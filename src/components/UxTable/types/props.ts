@@ -40,7 +40,18 @@ export interface UxTableColumn<RecordType> {
   fixed?: 'left' | 'right';
 }
 
+export interface UxTableRef {
+  /**
+   * 聚焦指定区域
+   */
+  focusArea: (area: { row: [number, number]; cols: [number, number] }) => void;
+}
+
 export interface UxTableProps<DataSource extends unknown[]> {
+  /**
+   * 引用
+   */
+  ref?: React.Ref<UxTableRef>;
   /**
    * 表格列的配置描述
    */
