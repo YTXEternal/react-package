@@ -35,6 +35,25 @@ export const useSelection = (tableRef: React.RefObject<HTMLDivElement | null>) =
         }
     };
 
+    const handleColHeaderMouseDown = (e: React.MouseEvent, colIndex: number, rowCount: number) => {
+        if (e.button !== 0) return; // Only left click
+        setIsSelecting(true);
+        setSelection({
+            start: { row: 0, col: colIndex },
+            end: { row: Math.max(0, rowCount - 1), col: colIndex }
+        });
+        tableRef.current?.focus();
+    };
+
+    const handleColHeaderMouseEnter = (colIndex: number, rowCount: number) => {
+        if (isSelecting && selection) {
+            setSelection({
+                ...selection,
+                end: { row: Math.max(0, rowCount - 1), col: colIndex }
+            });
+        }
+    };
+
     const isCellSelected = (rowIndex: number, colIndex: number) => {
         if (!selection) return false;
         const r1 = Math.min(selection.start.row, selection.end.row);
@@ -55,6 +74,8 @@ export const useSelection = (tableRef: React.RefObject<HTMLDivElement | null>) =
         isSelecting,
         handleCellMouseDown,
         handleCellMouseEnter,
+        handleColHeaderMouseDown,
+        handleColHeaderMouseEnter,
         isCellSelected,
         isCellActive
     };

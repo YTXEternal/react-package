@@ -36,16 +36,58 @@ describe('UxTable 组件', () => {
     });
   });
 
+  describe('行高调整测试', () => {
+    it('应该能够通过拖拽调整行高', () => {
+      // 获取第0行的初始高度
+      cy.get('[data-testid="ux-table-row-0"]').invoke('height').then((initialHeight) => {
+        // 在行高调整手柄上触发鼠标按下事件，并向下拖动
+        cy.get('[data-testid="ux-table-row-resizer-0"]')
+          .trigger('mousedown', { button: 0, clientY: 100, force: true })
+          // 模拟在 document 上移动鼠标
+          .document()
+          .trigger('mousemove', { clientY: 150, force: true })
+          .trigger('mouseup', { force: true });
+
+        // 检查新高度是否变大了 (增加了约 50px)
+        cy.get('[data-testid="ux-table-row-0"]').invoke('height').should('be.gt', initialHeight);
+      });
+    });
+  });
+
   describe('选中与聚焦测试', () => {
     it('单击单元格时应该正确选中并聚焦', () => {
       // 单击第一个单元格
       cy.get('[data-testid="ux-table-cell-0-0"]').click();
       
       // 检查是否具有活动选中状态的 box-shadow
-      // 根据实现，单选的活动单元格具有 'inset 0 0 0 2px #1890ff' 样式
       cy.get('[data-testid="ux-table-cell-0-0"]')
         .should('have.css', 'box-shadow')
         .and('include', 'rgb(24, 144, 255)'); // #1890ff 对应的 rgb
+    });
+
+    it('单击表头应该选中整列', () => {
+      // 单击第一列的表头
+      cy.get('[data-testid="ux-table-header-cell-0"]').click();
+      
+      // 第0行是 active cell（背景为白），第1行应该是选中状态 (背景色应变为 #e6f7ff，即 rgb(230, 247, 255))
+      cy.get('[data-testid="ux-table-cell-0-0"]')
+        .should('have.css', 'background-color')
+        .and('include', 'rgb(255, 255, 255)');
+      cy.get('[data-testid="ux-table-cell-1-0"]')
+        .should('have.css', 'background-color')
+        .and('include', 'rgb(230, 247, 255)');
+    });
+
+    it('Ctrl+A 应该全选表格', () => {
+      // 先选中一个单元格
+      cy.get('[data-testid="ux-table-cell-0-0"]').click();
+      // 按下 Ctrl+A
+      cy.get('body').type('{ctrl}a');
+      
+      // 检查其他单元格是否被选中
+      cy.get('[data-testid="ux-table-cell-1-1"]')
+        .should('have.css', 'background-color')
+        .and('include', 'rgb(230, 247, 255)');
     });
 
     it('应该支持键盘方向键导航', () => {
@@ -118,16 +160,20 @@ describe('UxTable 组件', () => {
   });
 
   describe('排序功能测试', () => {
-    it('点击表头应该对数据进行排序', () => {
-      // 按第一列 (固定列) 排序
-      // 初始数据顺序是 数据 0-0, 数据 1-0, 数据 2-0...
-      
-      // 点击表头 -> 升序 (由于已经是升序，我们连点两次测试降序)
-      cy.get('[data-testid="ux-table-header-cell-0"]').click(); // 升序
-      cy.get('[data-testid="ux-table-header-cell-0"]').click(); // 降序
-      
-      // 降序后，第一行第一列的数据肯定不再是 "数据 0-0"
-      cy.get('[data-testid="ux-table-cell-0-0"]').should('not.contain', '数据 0-0');
+    it('点击排序图标应该对数据进行排序，而点击表头不应该触发排序', () => {
+      // 记录第一行的原始值
+      cy.get('[data-testid="ux-table-cell-0-0"]').invoke('text').then((initialText) => {
+        // 点击表头本身（非排序图标），不应触发排序
+        cy.get('[data-testid="ux-table-header-cell-0"]').click('left');
+        cy.get('[data-testid="ux-table-cell-0-0"]').should('contain', initialText);
+
+        // 点击排序图标 -> 升序，再点一次 -> 降序
+        cy.get('[data-testid="ux-table-sorter-0"]').click({ force: true }); // 升序
+        cy.get('[data-testid="ux-table-sorter-0"]').click({ force: true }); // 降序
+        
+        // 降序后，第一行第一列的数据肯定不再是原始值
+        cy.get('[data-testid="ux-table-cell-0-0"]').should('not.contain', initialText);
+      });
     });
   });
 

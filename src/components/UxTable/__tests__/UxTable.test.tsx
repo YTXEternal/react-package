@@ -71,6 +71,60 @@ describe('UxTable Component', () => {
     expect(screen.getByText('C')).toBeInTheDocument();
   });
 
+  it('selects all cells when Ctrl+A is pressed', async () => {
+    const user = userEvent.setup();
+    render(<UxTable columns={columns} data={data} rowKey="key" />);
+    
+    const cell00 = screen.getByTestId('ux-table-cell-0-0');
+    
+    // Select cell
+    await user.click(cell00);
+    
+    // Press Ctrl+A
+    fireEvent.keyDown(cell00, { key: 'a', ctrlKey: true });
+    
+    // Both cells in the row should be selected (having blue background style)
+    const cell01 = screen.getByTestId('ux-table-cell-0-1');
+    expect(cell00).toHaveStyle({ backgroundColor: '#ffffff' }); // active cell is white
+    expect(cell01).toHaveStyle({ backgroundColor: '#e6f7ff' }); // selected cell is light blue
+  });
+
+  it('selects column when clicking on column header', async () => {
+    const user = userEvent.setup();
+    render(<UxTable columns={columns} data={data} rowKey="key" />);
+    
+    const headerCell = screen.getByTestId('ux-table-header-cell-0');
+    
+    // Select column
+    await user.click(headerCell);
+    
+    // The entire column should be selected
+    const cell00 = screen.getByTestId('ux-table-cell-0-0');
+    const cell10 = screen.getByTestId('ux-table-cell-1-0');
+    
+    expect(cell00).toHaveStyle({ backgroundColor: '#ffffff' }); // First cell might be active if it's the start
+    expect(cell10).toHaveStyle({ backgroundColor: '#e6f7ff' });
+  });
+
+  it('triggers sort only when sort icon is clicked', async () => {
+    const sortableColumns: UxTableColumn<DataType>[] = [
+      { title: 'Name', dataIndex: 'name', key: 'name', sorter: true }
+    ];
+    const user = userEvent.setup();
+    render(<UxTable columns={sortableColumns} data={data} rowKey="key" />);
+    
+    const headerCell = screen.getByTestId('ux-table-header-cell-0');
+    const sortIcon = screen.getByTestId('ux-table-sorter-0');
+    
+    // Clicking header cell shouldn't sort (order should remain original: John Doe first)
+    await user.click(headerCell);
+    expect(screen.getByTestId('ux-table-cell-0-0')).toHaveTextContent('John Doe');
+
+    // Clicking sort icon should sort (Ascending: Jane Doe first)
+    await user.click(sortIcon);
+    expect(screen.getByTestId('ux-table-cell-0-0')).toHaveTextContent('Jane Doe');
+  });
+
   describe('Copy functionality with marching ants animation', () => {
     it('should show marching ants animation when cells are copied', async () => {
       const user = userEvent.setup();

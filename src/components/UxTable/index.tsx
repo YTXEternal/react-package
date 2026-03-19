@@ -6,7 +6,7 @@ import { useSelection } from './hooks/useSelection';
 import { useEditing } from './hooks/useEditing';
 import { useFixedColumns } from './hooks/useFixedColumns';
 import { useClipboard } from './hooks/useClipboard';
-import { useVirtualizer } from '@tanstack/react-virtual';
+import { useVirtualizer, defaultRangeExtractor } from '@tanstack/react-virtual';
 import styles from './styles.module.css';
 import { CELL_HEIGHT } from './constants';
 
@@ -146,6 +146,8 @@ export const UxTable = <DataSource extends unknown[]>(props: UxTableProps<DataSo
         setSelection,
         handleCellMouseDown,
         handleCellMouseEnter,
+        handleColHeaderMouseDown,
+        handleColHeaderMouseEnter,
         isCellSelected,
         isCellActive
     } = useSelection(tableRef);
@@ -161,6 +163,10 @@ export const UxTable = <DataSource extends unknown[]>(props: UxTableProps<DataSo
     const { copyToClipboard } = useClipboard();
 
     const [copiedBounds, setCopiedBounds] = React.useState<{top: number, bottom: number, left: number, right: number} | null>(null);
+
+    // 行高管理
+    const [rowHeights, setRowHeights] = React.useState<Record<number, number>>({});
+    const resizingRowRef = useRef<{ index: number; startY: number; startHeight: number } | null>(null);
 
     React.useEffect(() => {
         if (editingCell) {
@@ -197,9 +203,14 @@ export const UxTable = <DataSource extends unknown[]>(props: UxTableProps<DataSo
     const rowVirtualizer = useVirtualizer({
         count: sortedData.length,
         getScrollElement: () => parentRef.current,
-        estimateSize: () => CELL_HEIGHT, // 默认行高
+        estimateSize: (index) => rowHeights[index] || CELL_HEIGHT, // 使用动态行高
         overscan: 5,
     });
+
+    // Notify virtualizer when row heights change
+    React.useEffect(() => {
+        rowVirtualizer.measure();
+    }, [rowHeights, rowVirtualizer]);
 
     const colVirtualizer = useVirtualizer({
         horizontal: true,
@@ -210,6 +221,18 @@ export const UxTable = <DataSource extends unknown[]>(props: UxTableProps<DataSo
             return typeof width === 'number' ? width : parseInt(width as unknown as string, 10) || 100;
         },
         overscan: 2,
+        rangeExtractor: React.useCallback(
+            (range: { startIndex: number; endIndex: number; overscan: number; count: number }) => {
+                const defaultRange = new Set(defaultRangeExtractor(range));
+                columns.forEach((col, index) => {
+                    if (col.fixed) {
+                        defaultRange.add(index);
+                    }
+                });
+                return Array.from(defaultRange).sort((a, b) => a - b);
+            },
+            [columns]
+        ),
     });
 
     // Notify virtualizer when column widths change
@@ -226,6 +249,42 @@ export const UxTable = <DataSource extends unknown[]>(props: UxTableProps<DataSo
         if (e.deltaX !== 0 && parentRef.current) {
             parentRef.current.scrollLeft += e.deltaX;
         }
+    };
+
+    // 行高调整相关处理
+    const handleRowResizeMouseDown = (e: React.MouseEvent, rowIndex: number) => {
+        e.preventDefault();
+        e.stopPropagation();
+        
+        const startHeight = rowHeights[rowIndex] || CELL_HEIGHT;
+        resizingRowRef.current = {
+            index: rowIndex,
+            startY: e.clientY,
+            startHeight
+        };
+
+        const handleMouseMove = (moveEvent: MouseEvent) => {
+            if (!resizingRowRef.current) return;
+            
+            const deltaY = moveEvent.clientY - resizingRowRef.current.startY;
+            const newHeight = Math.max(20, resizingRowRef.current.startHeight + deltaY); // 最小行高限制
+            
+            setRowHeights(prev => ({
+                ...prev,
+                [rowIndex]: newHeight
+            }));
+        };
+
+        const handleMouseUp = () => {
+            resizingRowRef.current = null;
+            document.removeEventListener('mousemove', handleMouseMove);
+            document.removeEventListener('mouseup', handleMouseUp);
+            document.body.style.cursor = '';
+        };
+
+        document.addEventListener('mousemove', handleMouseMove);
+        document.addEventListener('mouseup', handleMouseUp);
+        document.body.style.cursor = 'row-resize';
     };
 
     // 键盘事件策略模式处理
@@ -291,6 +350,15 @@ export const UxTable = <DataSource extends unknown[]>(props: UxTableProps<DataSo
         // 3. 直接输入 (单字符且无修饰键)
         if (e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey) {
             startEditing(start.row, start.col, e.key);
+        }
+
+        // 4. 全选 (Ctrl/Cmd + A)
+        if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'a') {
+            e.preventDefault();
+            setSelection({
+                start: { row: 0, col: 0 },
+                end: { row: sortedData.length - 1, col: columns.length - 1 }
+            });
         }
     };
 
@@ -432,7 +500,8 @@ export const UxTable = <DataSource extends unknown[]>(props: UxTableProps<DataSo
                                 <div
                                     key={key}
                                     data-testid={`ux-table-header-cell-${index}`}
-                                    onClick={() => handleSort(index)}
+                                    onMouseDown={(e) => handleColHeaderMouseDown(e, index, sortedData.length)}
+                                    onMouseEnter={() => handleColHeaderMouseEnter(index, sortedData.length)}
                                     style={{
                                         position: isFixed ? 'sticky' : 'absolute',
                                         left: isFixed === 'left' ? offset?.left : undefined,
@@ -449,7 +518,6 @@ export const UxTable = <DataSource extends unknown[]>(props: UxTableProps<DataSo
                                         boxSizing: 'border-box',
                                         textAlign: 'left',
                                         userSelect: 'none',
-                                        cursor: column.sorter ? 'pointer' : 'default',
                                         display: 'flex',
                                         alignItems: 'center',
                                         justifyContent: 'space-between'
@@ -459,7 +527,14 @@ export const UxTable = <DataSource extends unknown[]>(props: UxTableProps<DataSo
                                         {column.title as React.ReactNode}
                                     </span>
                                     {column.sorter && (
-                                        <div style={{ display: 'flex', flexDirection: 'column', fontSize: '10px', marginLeft: '8px' }}>
+                                        <div 
+                                            data-testid={`ux-table-sorter-${index}`}
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                handleSort(index);
+                                            }}
+                                            style={{ display: 'flex', flexDirection: 'column', fontSize: '10px', marginLeft: '8px', cursor: 'pointer' }}
+                                        >
                                             <span style={{ color: sortState?.colIndex === index && sortState.order === 'asc' ? '#1890ff' : '#bfbfbf', lineHeight: '10px' }}>▲</span>
                                             <span style={{ color: sortState?.colIndex === index && sortState.order === 'desc' ? '#1890ff' : '#bfbfbf', lineHeight: '10px' }}>▼</span>
                                         </div>
@@ -546,7 +621,7 @@ export const UxTable = <DataSource extends unknown[]>(props: UxTableProps<DataSo
                                                 width: `${virtualCol.size}px`,
                                                 height: '100%',
                                                 zIndex: isActive ? 4 : (isSelected ? 3 : (isFixed ? 2 : 1)),
-                                                backgroundColor: isSelected ? (isActive ? '#ffffff' : 'rgba(24, 144, 255, 0.1)') : '#ffffff',
+                                                backgroundColor: isSelected ? (isActive ? '#ffffff' : '#e6f7ff') : '#ffffff',
                                                 borderBottom: '1px solid #e8e8e8',
                                                 borderRight: '1px solid #e8e8e8',
                                                 boxShadow: [
@@ -572,6 +647,23 @@ export const UxTable = <DataSource extends unknown[]>(props: UxTableProps<DataSo
                                             {isCopiedBottom && <div className={styles['marching-ants-bottom']} />}
                                             {isCopiedLeft && <div className={styles['marching-ants-left']} />}
                                             {isCopiedRight && <div className={styles['marching-ants-right']} />}
+                                            
+                                            {colIndex === 0 && (
+                                                <div
+                                                    onMouseDown={(e) => handleRowResizeMouseDown(e, rowIndex)}
+                                                    style={{
+                                                        position: 'absolute',
+                                                        bottom: 0,
+                                                        left: 0,
+                                                        right: 0,
+                                                        height: '5px',
+                                                        cursor: 'row-resize',
+                                                        zIndex: 5
+                                                    }}
+                                                    data-testid={`ux-table-row-resizer-${rowIndex}`}
+                                                />
+                                            )}
+
                                             {isEditing ? (
                                                 <input
                                                     autoFocus
