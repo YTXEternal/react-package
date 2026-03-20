@@ -191,22 +191,33 @@ export const UxTable = <DataSource extends unknown[]>(props: UxTableProps<DataSo
         | { type: 'PASTE_PARSE'; data: { text: string } }
         | { type: 'PASTE'; data: { text: string; finalData: Record<string, unknown>[]; sortedData: Record<string, unknown>[]; columns: { editable?: boolean; dataIndex: string | number | symbol }[]; startRow: number; startCol: number } };
 
+    /**
+     * Web Worker 回调策略处理，使用策略模式优化不同的 worker 任务
+     * @param {WorkerPayload} payload 传递给 worker 的数据
+     * @returns {Promise<unknown>}
+     */
     const workerFallback = React.useCallback(async (payload: WorkerPayload) => {
-        if (payload.type === 'COPY') {
-            return processCopy(payload.data.selectedData, payload.data.columns as { key?: string | number | symbol; dataIndex: string | number | symbol }[]);
-        } else if (payload.type === 'PASTE_PARSE') {
-            return processPasteParse(payload.data.text);
-        } else if (payload.type === 'PASTE') {
-            return processPaste(
-                payload.data.text,
-                payload.data.finalData,
-                payload.data.sortedData,
-                payload.data.columns as { editable?: boolean; dataIndex: string | number | symbol }[],
-                payload.data.startRow,
-                payload.data.startCol
-            );
-        }
-        return null;
+        const strategies = {
+            COPY: (data: Extract<WorkerPayload, { type: 'COPY' }>['data']) =>
+                processCopy(data.selectedData, data.columns as { key?: string | number | symbol; dataIndex: string | number | symbol }[]),
+            PASTE_PARSE: (data: Extract<WorkerPayload, { type: 'PASTE_PARSE' }>['data']) =>
+                processPasteParse(data.text),
+            PASTE: (data: Extract<WorkerPayload, { type: 'PASTE' }>['data']) =>
+                processPaste(
+                    data.text,
+                    data.finalData,
+                    data.sortedData,
+                    data.columns as { editable?: boolean; dataIndex: string | number | symbol }[],
+                    data.startRow,
+                    data.startCol
+                )
+        };
+
+        const strategy = strategies[payload.type as keyof typeof strategies];
+        if (!strategy) return null; // 卫语句：找不到对应策略时返回 null
+
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        return strategy(payload.data as any);
     }, []);
 
     const workerScript = React.useCallback(() => {
@@ -311,18 +322,35 @@ export const UxTable = <DataSource extends unknown[]>(props: UxTableProps<DataSo
         }
     }, [lastRowIndex, lastColIndex, infinite, sortedData.length, columns.length]);
 
-    // 滚动同步复用
+    /**
+     * 处理主区域滚动，同步到底部滚动条
+     * @returns {void}
+     */
     const handleMainScroll = () => syncScroll(parentRef.current, scrollbarRef.current);
+
+    /**
+     * 处理底部滚动条滚动，同步到主区域
+     * @returns {void}
+     */
     const handleBottomScroll = () => syncScroll(scrollbarRef.current, parentRef.current);
 
-    // 支持触控板横向滚动
+    /**
+     * 支持触控板横向滚动
+     * @param {React.WheelEvent} e 滚轮事件对象
+     * @returns {void}
+     */
     const handleWheel = (e: React.WheelEvent) => {
         if (e.deltaX !== 0 && parentRef.current) {
             parentRef.current.scrollLeft += e.deltaX;
         }
     };
 
-    // 行高调整相关处理
+    /**
+     * 行高调整鼠标按下事件处理
+     * @param {React.MouseEvent} e 鼠标事件对象
+     * @param {number} rowIndex 行索引
+     * @returns {void}
+     */
     const handleRowResizeMouseDown = (e: React.MouseEvent, rowIndex: number) => {
         e.preventDefault();
         e.stopPropagation();
@@ -358,7 +386,13 @@ export const UxTable = <DataSource extends unknown[]>(props: UxTableProps<DataSo
         document.body.style.cursor = 'row-resize';
     };
 
-    // 键盘事件策略模式处理
+    /**
+     * 键盘事件策略模式处理
+     * @param {React.KeyboardEvent} e 键盘事件对象
+     * @param {number} currentRow 当前所在行索引
+     * @param {number} currentCol 当前所在列索引
+     * @returns {boolean} 是否命中了策略
+     */
     const executeKeyboardStrategy = (e: React.KeyboardEvent, currentRow: number, currentCol: number): boolean => {
         const rowCount = sortedData.length;
         const colCount = columns.length;
@@ -386,24 +420,25 @@ export const UxTable = <DataSource extends unknown[]>(props: UxTableProps<DataSo
         };
 
         const strategy = strategies[e.key];
-        if (strategy) {
-            e.preventDefault();
-            strategy();
-            return true;
-        }
+        if (!strategy) return false; // 卫语句：如果没有对应策略，直接返回 false
 
-        return false;
+        e.preventDefault();
+        strategy();
+        return true;
     };
 
-    // Keyboard & Paste Handlers
+    /**
+     * 处理键盘按下事件
+     * @param {React.KeyboardEvent} e 键盘事件对象
+     * @returns {void}
+     */
     const handleKeyDown = (e: React.KeyboardEvent) => {
-        if (e.key === 'Escape') {
-            if (copiedBounds) {
-                setCopiedBounds(null);
-                e.preventDefault();
-                return;
-            }
+        if (e.key === 'Escape' && copiedBounds) {
+            setCopiedBounds(null);
+            e.preventDefault();
+            return;
         }
+
         if (editingCell || !selection) return; // 卫语句：正在编辑或没有选区时直接返回
 
         const { start } = selection;
@@ -411,28 +446,35 @@ export const UxTable = <DataSource extends unknown[]>(props: UxTableProps<DataSo
         // 1. 尝试执行方向键和回车键策略
         if (executeKeyboardStrategy(e, start.row, start.col)) return;
 
+        const isCtrlOrMeta = e.ctrlKey || e.metaKey;
+
         // 2. 复制操作 (Ctrl/Cmd + C)
-        if ((e.ctrlKey || e.metaKey) && e.key === 'c') {
+        if (isCtrlOrMeta && e.key.toLowerCase() === 'c') {
             e.preventDefault();
             handleCopy();
             return;
         }
 
-        // 3. 直接输入 (单字符且无修饰键)
-        if (e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey) {
-            startEditing(start.row, start.col, e.key);
-        }
-
-        // 4. 全选 (Ctrl/Cmd + A)
-        if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'a') {
+        // 3. 全选 (Ctrl/Cmd + A)
+        if (isCtrlOrMeta && e.key.toLowerCase() === 'a') {
             e.preventDefault();
             setSelection({
                 start: { row: 0, col: 0 },
                 end: { row: sortedData.length - 1, col: columns.length - 1 }
             });
+            return;
+        }
+
+        // 4. 直接输入 (单字符且无修饰键)
+        if (e.key.length === 1 && !isCtrlOrMeta && !e.altKey) {
+            startEditing(start.row, start.col, e.key);
         }
     };
 
+    /**
+     * 处理复制事件
+     * @returns {Promise<void>}
+     */
     const handleCopy = async () => {
         if (!selection) return; // 卫语句：防止无选区时复制
         const r1 = Math.min(selection.start.row, selection.end.row);
@@ -461,6 +503,11 @@ export const UxTable = <DataSource extends unknown[]>(props: UxTableProps<DataSo
         }
     };
 
+    /**
+     * 处理粘贴事件
+     * @param {React.ClipboardEvent} e 剪贴板事件对象
+     * @returns {Promise<void>}
+     */
     const handlePaste = async (e: React.ClipboardEvent) => {
         if (!selection || !onDataChange) return; // 卫语句：无选区或无回调时返回
         setCopiedBounds(null);
@@ -500,6 +547,216 @@ export const UxTable = <DataSource extends unknown[]>(props: UxTableProps<DataSo
         } catch (error) {
             console.error('Paste worker failed:', error);
         }
+    };
+
+    /**
+     * 渲染表头单元格
+     * @param {import('@tanstack/react-virtual').VirtualItem} virtualCol 虚拟列数据
+     * @returns {React.ReactElement} 表头单元格组件
+     */
+    const renderHeaderCell = (virtualCol: ReturnType<typeof colVirtualizer.getVirtualItems>[0]) => {
+        const index = virtualCol.index;
+        const column = columns[index];
+        const key = column.key || String(column.dataIndex) || index;
+        const isFixed = column.fixed;
+        const offset = fixedOffsets[index];
+
+        return (
+            <div
+                key={key}
+                data-testid={`ux-table-header-cell-${index}`}
+                onMouseDown={(e) => handleColHeaderMouseDown(e, index, sortedData.length)}
+                onMouseEnter={() => handleColHeaderMouseEnter(index, sortedData.length)}
+                style={{
+                    position: isFixed ? 'sticky' : 'absolute',
+                    left: isFixed === 'left' ? offset?.left : undefined,
+                    right: isFixed === 'right' ? offset?.right : undefined,
+                    transform: isFixed ? undefined : `translateX(${virtualCol.start}px)`,
+                    width: `${virtualCol.size}px`,
+                    height: '100%',
+                    zIndex: isFixed ? 4 : 3,
+                    backgroundColor: '#fafafa',
+                    borderBottom: '1px solid #e8e8e8',
+                    borderRight: '1px solid #e8e8e8',
+                    boxShadow: offset?.isLastLeft ? '6px 0 6px -4px rgba(0,0,0,0.1)' : (offset?.isFirstRight ? '-6px 0 6px -4px rgba(0,0,0,0.1)' : 'none'),
+                    padding: '8px 16px',
+                    boxSizing: 'border-box',
+                    textAlign: 'left',
+                    userSelect: 'none',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between'
+                }}
+            >
+                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {column.title as React.ReactNode}
+                </span>
+                {column.sorter && (
+                    <div 
+                        data-testid={`ux-table-sorter-${index}`}
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            handleSort(index);
+                        }}
+                        style={{ display: 'flex', flexDirection: 'column', fontSize: '10px', marginLeft: '8px', cursor: 'pointer' }}
+                    >
+                        <span style={{ color: sortState?.colIndex === index && sortState.order === 'asc' ? '#1890ff' : '#bfbfbf', lineHeight: '10px' }}>▲</span>
+                        <span style={{ color: sortState?.colIndex === index && sortState.order === 'desc' ? '#1890ff' : '#bfbfbf', lineHeight: '10px' }}>▼</span>
+                    </div>
+                )}
+                {column.resizable !== false && (
+                    <div
+                        data-testid={`ux-table-resizer-${index}`}
+                        onMouseDown={(e) => handleResizeMouseDown(e, index)}
+                        style={{
+                            position: 'absolute',
+                            right: 0,
+                            top: 0,
+                            bottom: 0,
+                            width: '5px',
+                            cursor: 'col-resize',
+                            zIndex: 1
+                        }}
+                    />
+                )}
+            </div>
+        );
+    };
+
+    /**
+     * 渲染数据体单元格
+     * @param {import('@tanstack/react-virtual').VirtualItem} virtualCol 虚拟列数据
+     * @param {number} rowIndex 行索引
+     * @param {Record<string, unknown>} record 行数据
+     * @returns {React.ReactElement} 数据体单元格组件
+     */
+    const renderBodyCell = (virtualCol: ReturnType<typeof colVirtualizer.getVirtualItems>[0], rowIndex: number, record: Record<string, unknown>) => {
+        const colIndex = virtualCol.index;
+        const column = columns[colIndex];
+        const colKey = column.key || String(column.dataIndex) || colIndex;
+        const isFixed = column.fixed;
+        const offset = fixedOffsets[colIndex];
+        const isSelected = isCellSelected(rowIndex, colIndex);
+        const isActive = isCellActive(rowIndex, colIndex);
+        const isEditing = editingCell?.rowIndex === rowIndex && editingCell?.colIndex === colIndex;
+        const value = record[column.dataIndex as string];
+
+        const isCopied = copiedBounds && 
+            rowIndex >= copiedBounds.top && rowIndex <= copiedBounds.bottom && 
+            colIndex >= copiedBounds.left && colIndex <= copiedBounds.right;
+        const isCopiedTop = isCopied && rowIndex === copiedBounds.top;
+        const isCopiedBottom = isCopied && rowIndex === copiedBounds.bottom;
+        const isCopiedLeft = isCopied && colIndex === copiedBounds.left;
+        const isCopiedRight = isCopied && colIndex === copiedBounds.right;
+
+        return (
+            <div
+                key={colKey}
+                data-testid={`ux-table-cell-${rowIndex}-${colIndex}`}
+                onMouseDown={(e) => {
+                    const isLineNumberCol = column.key === '_line_number_';
+                    handleCellMouseDown(e, rowIndex, colIndex, columns.length, isLineNumberCol);
+                }}
+                onMouseEnter={() => {
+                    const isRowSelectionMode = selection && selection.start.col === 0 && selection.end.col === columns.length - 1;
+                    const isLineNumberCol = column.key === '_line_number_';
+                    handleCellMouseEnter(rowIndex, colIndex, columns.length, isLineNumberCol || !!isRowSelectionMode);
+                }}
+                onDoubleClick={() => {
+                    if (column.editable !== false) {
+                        startEditing(rowIndex, colIndex);
+                    }
+                }}
+                style={{
+                    position: isFixed ? 'sticky' : 'absolute',
+                    left: isFixed === 'left' ? offset?.left : undefined,
+                    right: isFixed === 'right' ? offset?.right : undefined,
+                    transform: isFixed ? undefined : `translateX(${virtualCol.start}px)`,
+                    width: `${virtualCol.size}px`,
+                    height: '100%',
+                    zIndex: isFixed ? (isActive ? 6 : (isSelected ? 5 : 4)) : (isActive ? 3 : (isSelected ? 2 : 1)),
+                    backgroundColor: isSelected ? (isActive ? '#ffffff' : '#e6f7ff') : '#ffffff',
+                    borderBottom: '1px solid #e8e8e8',
+                    borderRight: '1px solid #e8e8e8',
+                    boxShadow: [
+                        (isSelected && selectionBounds?.top === rowIndex) ? 'inset 0 2px 0 0 #1890ff' : 'none',
+                        (isSelected && selectionBounds?.bottom === rowIndex) ? 'inset 0 -2px 0 0 #1890ff' : 'none',
+                        (isSelected && selectionBounds?.left === colIndex) ? 'inset 2px 0 0 0 #1890ff' : 'none',
+                        (isSelected && selectionBounds?.right === colIndex) ? 'inset -2px 0 0 0 #1890ff' : 'none',
+                        (isActive && (!selectionBounds || (selectionBounds.top === selectionBounds.bottom && selectionBounds.left === selectionBounds.right))) ? 'inset 0 0 0 2px #1890ff' : 'none',
+                        offset?.isLastLeft ? '6px 0 6px -4px rgba(0,0,0,0.1)' : 'none',
+                        offset?.isFirstRight ? '-6px 0 6px -4px rgba(0,0,0,0.1)' : 'none'
+                    ].filter(s => s !== 'none').join(', ') || 'none',
+                    padding: isEditing || column.key === '_line_number_' ? 0 : '8px 16px',
+                    boxSizing: 'border-box',
+                    overflow: isEditing ? 'visible' : 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap',
+                    cursor: 'cell',
+                    display: 'flex',
+                    alignItems: 'center'
+                }}
+            >
+                {isCopiedTop && <div className={styles['marching-ants-top']} />}
+                {isCopiedBottom && <div className={styles['marching-ants-bottom']} />}
+                {isCopiedLeft && <div className={styles['marching-ants-left']} />}
+                {isCopiedRight && <div className={styles['marching-ants-right']} />}
+                
+                {colIndex === 0 && (
+                    <div
+                        onMouseDown={(e) => handleRowResizeMouseDown(e, rowIndex)}
+                        style={{
+                            position: 'absolute',
+                            bottom: 0,
+                            left: 0,
+                            right: 0,
+                            height: '5px',
+                            cursor: 'row-resize',
+                            zIndex: 5
+                        }}
+                        data-testid={`ux-table-row-resizer-${rowIndex}`}
+                    />
+                )}
+
+                {isEditing ? (
+                    <input
+                        autoFocus
+                        value={editValue}
+                        onChange={(e) => setEditValue(e.target.value)}
+                        onBlur={() => {
+                            if (!isCancelingRef.current) {
+                                saveEdit();
+                            }
+                            isCancelingRef.current = false;
+                        }}
+                        onKeyDown={(e) => {
+                            e.stopPropagation();
+                            if (e.key === 'Enter') {
+                                saveEdit();
+                            } else if (e.key === 'Escape') {
+                                isCancelingRef.current = true;
+                                setEditingCell(null);
+                                tableRef.current?.focus();
+                            }
+                        }}
+                        style={{
+                            width: '100%',
+                            height: '100%',
+                            boxSizing: 'border-box',
+                            border: '2px solid #1890ff',
+                            padding: '6px 14px',
+                            outline: 'none',
+                            fontFamily: 'inherit',
+                            fontSize: 'inherit'
+                        }}
+                    />
+                ) : (
+                    <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', width: '100%', display: 'flex', justifyContent: column.key === '_line_number_' ? 'center' : 'flex-start' }}>
+                        {column.render ? column.render(value, record as DataSource[number], rowIndex) : (value as React.ReactNode)}
+                    </div>
+                )}
+            </div>
+        );
     };
 
     return (
@@ -549,74 +806,7 @@ export const UxTable = <DataSource extends unknown[]>(props: UxTableProps<DataSo
                         display: 'flex',
                         height: '40px', // 固定表头高度
                     }} data-testid="ux-table-header-row">
-                        {colVirtualizer.getVirtualItems().map((virtualCol) => {
-                            const index = virtualCol.index;
-                            const column = columns[index];
-                            const key = column.key || String(column.dataIndex) || index;
-                            const isFixed = column.fixed;
-                            const offset = fixedOffsets[index];
-
-                            return (
-                                <div
-                                    key={key}
-                                    data-testid={`ux-table-header-cell-${index}`}
-                                    onMouseDown={(e) => handleColHeaderMouseDown(e, index, sortedData.length)}
-                                    onMouseEnter={() => handleColHeaderMouseEnter(index, sortedData.length)}
-                                    style={{
-                                        position: isFixed ? 'sticky' : 'absolute',
-                                        left: isFixed === 'left' ? offset?.left : undefined,
-                                        right: isFixed === 'right' ? offset?.right : undefined,
-                                        transform: isFixed ? undefined : `translateX(${virtualCol.start}px)`,
-                                        width: `${virtualCol.size}px`,
-                                        height: '100%',
-                                        zIndex: isFixed ? 4 : 3,
-                                        backgroundColor: '#fafafa',
-                                        borderBottom: '1px solid #e8e8e8',
-                                        borderRight: '1px solid #e8e8e8',
-                                        boxShadow: offset?.isLastLeft ? '6px 0 6px -4px rgba(0,0,0,0.1)' : (offset?.isFirstRight ? '-6px 0 6px -4px rgba(0,0,0,0.1)' : 'none'),
-                                        padding: '8px 16px',
-                                        boxSizing: 'border-box',
-                                        textAlign: 'left',
-                                        userSelect: 'none',
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        justifyContent: 'space-between'
-                                    }}
-                                >
-                                    <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                        {column.title as React.ReactNode}
-                                    </span>
-                                    {column.sorter && (
-                                        <div 
-                                            data-testid={`ux-table-sorter-${index}`}
-                                            onClick={(e) => {
-                                                e.stopPropagation();
-                                                handleSort(index);
-                                            }}
-                                            style={{ display: 'flex', flexDirection: 'column', fontSize: '10px', marginLeft: '8px', cursor: 'pointer' }}
-                                        >
-                                            <span style={{ color: sortState?.colIndex === index && sortState.order === 'asc' ? '#1890ff' : '#bfbfbf', lineHeight: '10px' }}>▲</span>
-                                            <span style={{ color: sortState?.colIndex === index && sortState.order === 'desc' ? '#1890ff' : '#bfbfbf', lineHeight: '10px' }}>▼</span>
-                                        </div>
-                                    )}
-                                    {column.resizable !== false && (
-                                        <div
-                                            data-testid={`ux-table-resizer-${index}`}
-                                            onMouseDown={(e) => handleResizeMouseDown(e, index)}
-                                            style={{
-                                                position: 'absolute',
-                                                right: 0,
-                                                top: 0,
-                                                bottom: 0,
-                                                width: '5px',
-                                                cursor: 'col-resize',
-                                                zIndex: 1
-                                            }}
-                                        />
-                                    )}
-                                </div>
-                            );
-                        })}
+                        {colVirtualizer.getVirtualItems().map(renderHeaderCell)}
                     </div>
                     {/* 渲染数据体 */}
                     {rowVirtualizer.getVirtualItems().map((virtualRow) => {
@@ -647,146 +837,7 @@ export const UxTable = <DataSource extends unknown[]>(props: UxTableProps<DataSo
                                     }) ? 2 : 1 // 提升包含选中单元格的行的层级
                                 }}
                             >
-                                {colVirtualizer.getVirtualItems().map((virtualCol) => {
-                                    const colIndex = virtualCol.index;
-                                    const column = columns[colIndex];
-                                    const colKey = column.key || String(column.dataIndex) || colIndex;
-                                    const isFixed = column.fixed;
-                                    const offset = fixedOffsets[colIndex];
-                                    const isSelected = isCellSelected(rowIndex, colIndex);
-                                    const isActive = isCellActive(rowIndex, colIndex);
-                                    const isEditing = editingCell?.rowIndex === rowIndex && editingCell?.colIndex === colIndex;
-                                    const value = (record as Record<string, unknown>)[column.dataIndex as string];
-
-                                    const isCopied = copiedBounds && 
-                                        rowIndex >= copiedBounds.top && rowIndex <= copiedBounds.bottom && 
-                                        colIndex >= copiedBounds.left && colIndex <= copiedBounds.right;
-                                    const isCopiedTop = isCopied && rowIndex === copiedBounds.top;
-                                    const isCopiedBottom = isCopied && rowIndex === copiedBounds.bottom;
-                                    const isCopiedLeft = isCopied && colIndex === copiedBounds.left;
-                                    const isCopiedRight = isCopied && colIndex === copiedBounds.right;
-
-                                    return (
-                                        <div
-                                            key={colKey}
-                                            data-testid={`ux-table-cell-${rowIndex}-${colIndex}`}
-                                            onMouseDown={(e) => {
-                                                // 当点击行号列时，强制标记 isLineNumberCol 为 true，同时记录起始选区信息
-                                                if (column.key === '_line_number_') {
-                                                    handleCellMouseDown(e, rowIndex, colIndex, columns.length, true);
-                                                } else {
-                                                    handleCellMouseDown(e, rowIndex, colIndex, columns.length, false);
-                                                }
-                                            }}
-                                            onMouseEnter={() => {
-                                                // 判断当前是否是从行号列触发的拖拽，如果是，即使悬浮在其他列也应该只扩展行
-                                                // 如果起点的 col 也是 0（即行号列）且宽度跨越了所有列，说明处于整行选中模式
-                                                const isRowSelectionMode = selection && selection.start.col === 0 && selection.end.col === columns.length - 1;
-                                                
-                                                if (column.key === '_line_number_' || isRowSelectionMode) {
-                                                    handleCellMouseEnter(rowIndex, colIndex, columns.length, true);
-                                                } else {
-                                                    handleCellMouseEnter(rowIndex, colIndex, columns.length, false);
-                                                }
-                                            }}
-                                            onDoubleClick={() => {
-                                                if (column.editable !== false) {
-                                                    startEditing(rowIndex, colIndex);
-                                                }
-                                            }}
-                                            style={{
-                                                position: isFixed ? 'sticky' : 'absolute',
-                                                left: isFixed === 'left' ? offset?.left : undefined,
-                                                right: isFixed === 'right' ? offset?.right : undefined,
-                                                transform: isFixed ? undefined : `translateX(${virtualCol.start}px)`,
-                                                width: `${virtualCol.size}px`,
-                                                height: '100%',
-                                                // 确保固定列（isFixed）始终有最高的层级以覆盖普通滚动列
-                                                // 如果固定列被选中或激活，层级还要再提高，避免选框被相邻固定列遮挡
-                                                zIndex: isFixed ? (isActive ? 6 : (isSelected ? 5 : 4)) : (isActive ? 3 : (isSelected ? 2 : 1)),
-                                                backgroundColor: isSelected ? (isActive ? '#ffffff' : '#e6f7ff') : '#ffffff',
-                                                borderBottom: '1px solid #e8e8e8',
-                                                borderRight: '1px solid #e8e8e8',
-                                                boxShadow: [
-                                                    (isSelected && selectionBounds?.top === rowIndex) ? 'inset 0 2px 0 0 #1890ff' : 'none',
-                                                    (isSelected && selectionBounds?.bottom === rowIndex) ? 'inset 0 -2px 0 0 #1890ff' : 'none',
-                                                    (isSelected && selectionBounds?.left === colIndex) ? 'inset 2px 0 0 0 #1890ff' : 'none',
-                                                    (isSelected && selectionBounds?.right === colIndex) ? 'inset -2px 0 0 0 #1890ff' : 'none',
-                                                    (isActive && (!selectionBounds || (selectionBounds.top === selectionBounds.bottom && selectionBounds.left === selectionBounds.right))) ? 'inset 0 0 0 2px #1890ff' : 'none',
-                                                    offset?.isLastLeft ? '6px 0 6px -4px rgba(0,0,0,0.1)' : 'none',
-                                                    offset?.isFirstRight ? '-6px 0 6px -4px rgba(0,0,0,0.1)' : 'none'
-                                                ].filter(s => s !== 'none').join(', ') || 'none',
-                                                padding: isEditing || column.key === '_line_number_' ? 0 : '8px 16px',
-                                                boxSizing: 'border-box',
-                                                overflow: isEditing ? 'visible' : 'hidden',
-                                                textOverflow: 'ellipsis',
-                                                whiteSpace: 'nowrap',
-                                                cursor: 'cell',
-                                                display: 'flex',
-                                                alignItems: 'center'
-                                            }}
-                                        >
-                                            {isCopiedTop && <div className={styles['marching-ants-top']} />}
-                                            {isCopiedBottom && <div className={styles['marching-ants-bottom']} />}
-                                            {isCopiedLeft && <div className={styles['marching-ants-left']} />}
-                                            {isCopiedRight && <div className={styles['marching-ants-right']} />}
-                                            
-                                            {colIndex === 0 && (
-                                                <div
-                                                    onMouseDown={(e) => handleRowResizeMouseDown(e, rowIndex)}
-                                                    style={{
-                                                        position: 'absolute',
-                                                        bottom: 0,
-                                                        left: 0,
-                                                        right: 0,
-                                                        height: '5px',
-                                                        cursor: 'row-resize',
-                                                        zIndex: 5
-                                                    }}
-                                                    data-testid={`ux-table-row-resizer-${rowIndex}`}
-                                                />
-                                            )}
-
-                                            {isEditing ? (
-                                                <input
-                                                    autoFocus
-                                                    value={editValue}
-                                                    onChange={(e) => setEditValue(e.target.value)}
-                                                    onBlur={() => {
-                                                        if (!isCancelingRef.current) {
-                                                            saveEdit();
-                                                        }
-                                                        isCancelingRef.current = false;
-                                                    }}
-                                                    onKeyDown={(e) => {
-                                                        e.stopPropagation();
-                                                        if (e.key === 'Enter') {
-                                                            saveEdit();
-                                                        } else if (e.key === 'Escape') {
-                                                            isCancelingRef.current = true;
-                                                            setEditingCell(null);
-                                                            tableRef.current?.focus();
-                                                        }
-                                                    }}
-                                                    style={{
-                                                        width: '100%',
-                                                        height: '100%',
-                                                        boxSizing: 'border-box',
-                                                        border: '2px solid #1890ff',
-                                                        padding: '6px 14px',
-                                                        outline: 'none',
-                                                        fontFamily: 'inherit',
-                                                        fontSize: 'inherit'
-                                                    }}
-                                                />
-                                            ) : (
-                                                <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', width: '100%', display: 'flex', justifyContent: column.key === '_line_number_' ? 'center' : 'flex-start' }}>
-                                                    {column.render ? column.render(value, record, rowIndex) : (value as React.ReactNode)}
-                                                </div>
-                                            )}
-                                        </div>
-                                    );
-                                })}
+                                {colVirtualizer.getVirtualItems().map(virtualCol => renderBodyCell(virtualCol, rowIndex, record as Record<string, unknown>))}
                             </div>
                         );
                     })}
