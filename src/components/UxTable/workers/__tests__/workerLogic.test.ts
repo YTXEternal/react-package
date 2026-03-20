@@ -1,4 +1,4 @@
-import { processCopy, processPasteParse, processPaste } from '../workerLogic';
+import { processCopy, processPasteParse, processPaste, processDelete } from '../workerLogic';
 
 describe('workerLogic', () => {
     describe('processCopy', () => {
@@ -37,6 +37,61 @@ describe('workerLogic', () => {
             
             const result = processCopy(data, columns);
             expect(result).toBe('John\t\t');
+        });
+    });
+
+    describe('processDelete', () => {
+        it('should correctly delete specified bounds and set values to null', () => {
+            const finalData = [
+                { name: 'John', age: 30, id: 1 },
+                { name: 'Jane', age: 25, id: 2 },
+                { name: 'Bob', age: 40, id: 3 }
+            ];
+            const sortedData = [...finalData];
+            const columns = [
+                { editable: true, dataIndex: 'name' },
+                { editable: true, dataIndex: 'age' },
+                { editable: false, dataIndex: 'id' }
+            ];
+
+            const bounds = { top: 0, bottom: 1, left: 0, right: 1 };
+            const result = processDelete(finalData, sortedData, columns, bounds);
+
+            expect(result).not.toBeNull();
+            expect(result?.newData).toEqual([
+                { name: null, age: null, id: 1 },
+                { name: null, age: null, id: 2 },
+                { name: 'Bob', age: 40, id: 3 }
+            ]);
+        });
+
+        it('should respect column editable false property and skip _line_number_ column', () => {
+            const finalData = [
+                { name: 'John', age: 30, id: 1 }
+            ];
+            const sortedData = [...finalData];
+            const columns = [
+                { key: '_line_number_', dataIndex: 'line' },
+                { editable: false, dataIndex: 'name' },
+                { editable: true, dataIndex: 'age' }
+            ];
+
+            const bounds = { top: 0, bottom: 0, left: 0, right: 2 };
+            const result = processDelete(finalData, sortedData, columns, bounds);
+
+            expect(result).not.toBeNull();
+            expect(result?.newData).toEqual([
+                { name: 'John', age: null, id: 1 }
+            ]);
+        });
+
+        it('should return null if no valid changes', () => {
+            const finalData = [{ name: 'John' }];
+            const columns = [{ editable: false, dataIndex: 'name' }];
+            const bounds = { top: 0, bottom: 0, left: 0, right: 0 };
+            
+            const result = processDelete(finalData, finalData, columns, bounds);
+            expect(result).toBeNull();
         });
     });
 
@@ -102,6 +157,48 @@ describe('workerLogic', () => {
             expect(result).not.toBeNull();
             expect(result?.newData).toEqual([
                 { name: 'John', age: '35' } // name is unchanged
+            ]);
+        });
+
+        it('should clear cutBounds if provided before pasting', () => {
+            const text = 'NewJohn\t35';
+            const finalData = [
+                { name: 'John', age: 30 },
+                { name: 'Jane', age: 25 }
+            ];
+            const sortedData = [...finalData];
+            const columns = [
+                { editable: true, dataIndex: 'name' },
+                { editable: true, dataIndex: 'age' }
+            ];
+
+            const cutBounds = { top: 1, bottom: 1, left: 0, right: 1 };
+            const result = processPaste(text, finalData, sortedData, columns, 0, 0, cutBounds);
+            
+            expect(result).not.toBeNull();
+            expect(result?.newData).toEqual([
+                { name: 'NewJohn', age: '35' }, // Pasted row
+                { name: null, age: null }       // Cut bounds cleared
+            ]);
+        });
+
+        it('should clear cutBounds even if pasted text overwrites the same cells', () => {
+            const text = 'NewJohn\t35';
+            const finalData = [
+                { name: 'John', age: 30 }
+            ];
+            const sortedData = [...finalData];
+            const columns = [
+                { editable: true, dataIndex: 'name' },
+                { editable: true, dataIndex: 'age' }
+            ];
+
+            const cutBounds = { top: 0, bottom: 0, left: 0, right: 1 };
+            const result = processPaste(text, finalData, sortedData, columns, 0, 0, cutBounds);
+            
+            expect(result).not.toBeNull();
+            expect(result?.newData).toEqual([
+                { name: 'NewJohn', age: '35' } // Pasted row correctly applied
             ]);
         });
 

@@ -7,7 +7,7 @@ import { useEditing } from './hooks/useEditing';
 import { useFixedColumns } from './hooks/useFixedColumns';
 import { useClipboard } from './hooks/useClipboard';
 import { useWebWorker } from './hooks/useWebWorker';
-import { processCopy, processPasteParse, processPaste } from './workers/workerLogic';
+import { processCopy, processPasteParse, processPaste, processDelete } from './workers/workerLogic';
 import { createTableWorker } from './workers/createWorker';
 import { useVirtualizer, defaultRangeExtractor } from '@tanstack/react-virtual';
 import styles from './styles.module.css';
@@ -189,7 +189,8 @@ export const UxTable = <DataSource extends unknown[]>(props: UxTableProps<DataSo
     type WorkerPayload = 
         | { type: 'COPY'; data: { selectedData: Record<string, unknown>[]; columns: { key?: React.Key; dataIndex: string | number | symbol }[] } }
         | { type: 'PASTE_PARSE'; data: { text: string } }
-        | { type: 'PASTE'; data: { text: string; finalData: Record<string, unknown>[]; sortedData: Record<string, unknown>[]; columns: { editable?: boolean; dataIndex: string | number | symbol }[]; startRow: number; startCol: number } };
+        | { type: 'PASTE'; data: { text: string; finalData: Record<string, unknown>[]; sortedData: Record<string, unknown>[]; columns: { editable?: boolean; dataIndex: string | number | symbol; key?: React.Key }[]; startRow: number; startCol: number; cutBounds?: { top: number; bottom: number; left: number; right: number } | null } }
+        | { type: 'DELETE'; data: { finalData: Record<string, unknown>[]; sortedData: Record<string, unknown>[]; columns: { editable?: boolean; dataIndex: string | number | symbol; key?: React.Key }[]; bounds: { top: number; bottom: number; left: number; right: number } } };
 
     /**
      * Web Worker 回调策略处理，使用策略模式优化不同的 worker 任务
@@ -207,9 +208,17 @@ export const UxTable = <DataSource extends unknown[]>(props: UxTableProps<DataSo
                     data.text,
                     data.finalData,
                     data.sortedData,
-                    data.columns as { editable?: boolean; dataIndex: string | number | symbol }[],
+                    data.columns as { editable?: boolean; dataIndex: string | number | symbol; key?: string | number | symbol }[],
                     data.startRow,
-                    data.startCol
+                    data.startCol,
+                    data.cutBounds
+                ),
+            DELETE: (data: Extract<WorkerPayload, { type: 'DELETE' }>['data']) =>
+                processDelete(
+                    data.finalData,
+                    data.sortedData,
+                    data.columns as { editable?: boolean; dataIndex: string | number | symbol; key?: string | number | symbol }[],
+                    data.bounds
                 )
         };
 
@@ -224,9 +233,10 @@ export const UxTable = <DataSource extends unknown[]>(props: UxTableProps<DataSo
         return createTableWorker();
     }, []);
 
-    const { postMessage: postWorkerMessage } = useWebWorker<WorkerPayload, string | string[][] | { newData: Record<string, unknown>[]; maxRowIdx: number; maxColIdx: number } | null>(workerScript, workerFallback, isWorker);
+    const { postMessage: postWorkerMessage } = useWebWorker<WorkerPayload, string | string[][] | { newData: Record<string, unknown>[]; maxRowIdx?: number; maxColIdx?: number } | null>(workerScript, workerFallback, isWorker);
 
     const [copiedBounds, setCopiedBounds] = React.useState<{top: number, bottom: number, left: number, right: number} | null>(null);
+    const [cutBounds, setCutBounds] = React.useState<{top: number, bottom: number, left: number, right: number} | null>(null);
 
     // 行高管理
     const [rowHeights, setRowHeights] = React.useState<Record<number, number>>({});
@@ -235,6 +245,7 @@ export const UxTable = <DataSource extends unknown[]>(props: UxTableProps<DataSo
     React.useEffect(() => {
         if (editingCell) {
             setCopiedBounds(null);
+            setCutBounds(null);
         }
     }, [editingCell]);
 
@@ -433,8 +444,9 @@ export const UxTable = <DataSource extends unknown[]>(props: UxTableProps<DataSo
      * @returns {void}
      */
     const handleKeyDown = (e: React.KeyboardEvent) => {
-        if (e.key === 'Escape' && copiedBounds) {
+        if (e.key === 'Escape' && (copiedBounds || cutBounds)) {
             setCopiedBounds(null);
+            setCutBounds(null);
             e.preventDefault();
             return;
         }
@@ -455,6 +467,13 @@ export const UxTable = <DataSource extends unknown[]>(props: UxTableProps<DataSo
             return;
         }
 
+        // 剪切操作 (Ctrl/Cmd + X)
+        if (isCtrlOrMeta && e.key.toLowerCase() === 'x') {
+            e.preventDefault();
+            handleCut();
+            return;
+        }
+
         // 3. 全选 (Ctrl/Cmd + A)
         if (isCtrlOrMeta && e.key.toLowerCase() === 'a') {
             e.preventDefault();
@@ -462,6 +481,13 @@ export const UxTable = <DataSource extends unknown[]>(props: UxTableProps<DataSo
                 start: { row: 0, col: 0 },
                 end: { row: sortedData.length - 1, col: columns.length - 1 }
             });
+            return;
+        }
+
+        // 删除操作 (Delete)
+        if (e.key === 'Delete') {
+            e.preventDefault();
+            handleDelete();
             return;
         }
 
@@ -483,6 +509,7 @@ export const UxTable = <DataSource extends unknown[]>(props: UxTableProps<DataSo
         const c2 = Math.max(selection.start.col, selection.end.col);
 
         setCopiedBounds({ top: r1, bottom: r2, left: c1, right: c2 });
+        setCutBounds(null); // 互斥
 
         const selectedData = sortedData.slice(r1, r2 + 1) as Record<string, unknown>[];
         const sanitizedColumns = columns.slice(c1, c2 + 1).map(col => ({
@@ -504,13 +531,81 @@ export const UxTable = <DataSource extends unknown[]>(props: UxTableProps<DataSo
     };
 
     /**
+     * 处理剪切事件
+     * @returns {Promise<void>}
+     */
+    const handleCut = async () => {
+        if (!selection) return; // 卫语句：防止无选区时剪切
+        const r1 = Math.min(selection.start.row, selection.end.row);
+        const r2 = Math.max(selection.start.row, selection.end.row);
+        const c1 = Math.min(selection.start.col, selection.end.col);
+        const c2 = Math.max(selection.start.col, selection.end.col);
+
+        setCutBounds({ top: r1, bottom: r2, left: c1, right: c2 });
+        setCopiedBounds(null); // 互斥
+
+        const selectedData = sortedData.slice(r1, r2 + 1) as Record<string, unknown>[];
+        const sanitizedColumns = columns.slice(c1, c2 + 1).map(col => ({
+            key: col.key,
+            dataIndex: col.dataIndex
+        }));
+
+        try {
+            const text = await postWorkerMessage({
+                type: 'COPY',
+                data: { selectedData, columns: sanitizedColumns }
+            });
+            if (typeof text === 'string' && text) {
+                copyToClipboard(text);
+            }
+        } catch (error) {
+            console.error('Cut worker failed:', error);
+        }
+    };
+
+    /**
+     * 处理删除事件
+     * @returns {Promise<void>}
+     */
+    const handleDelete = async () => {
+        if (!selection || !onDataChange) return; // 卫语句：无选区或无回调时返回
+        const r1 = Math.min(selection.start.row, selection.end.row);
+        const r2 = Math.max(selection.start.row, selection.end.row);
+        const c1 = Math.min(selection.start.col, selection.end.col);
+        const c2 = Math.max(selection.start.col, selection.end.col);
+
+        const sanitizedColumns = columns.map(col => ({
+            key: col.key,
+            editable: col.editable,
+            dataIndex: col.dataIndex
+        }));
+
+        try {
+            const result = await postWorkerMessage({
+                type: 'DELETE',
+                data: {
+                    finalData: finalData as Record<string, unknown>[],
+                    sortedData: sortedData as Record<string, unknown>[],
+                    columns: sanitizedColumns,
+                    bounds: { top: r1, bottom: r2, left: c1, right: c2 }
+                }
+            }) as { newData: Record<string, unknown>[] } | null;
+
+            if (result && result.newData) {
+                onDataChange(result.newData as DataSource);
+            }
+        } catch (error) {
+            console.error('Delete worker failed:', error);
+        }
+    };
+
+    /**
      * 处理粘贴事件
      * @param {React.ClipboardEvent} e 剪贴板事件对象
      * @returns {Promise<void>}
      */
     const handlePaste = async (e: React.ClipboardEvent) => {
         if (!selection || !onDataChange) return; // 卫语句：无选区或无回调时返回
-        setCopiedBounds(null);
         e.preventDefault();
         const text = e.clipboardData.getData('text/plain');
         if (!text) return; // 卫语句：无粘贴内容时返回
@@ -520,6 +615,7 @@ export const UxTable = <DataSource extends unknown[]>(props: UxTableProps<DataSo
             const startCol = Math.min(selection.start.col, selection.end.col);
 
             const sanitizedColumns = columns.map(col => ({
+                key: col.key,
                 editable: col.editable,
                 dataIndex: col.dataIndex
             }));
@@ -532,7 +628,8 @@ export const UxTable = <DataSource extends unknown[]>(props: UxTableProps<DataSo
                     sortedData: sortedData as Record<string, unknown>[],
                     columns: sanitizedColumns,
                     startRow,
-                    startCol
+                    startCol,
+                    cutBounds
                 }
             }) as { newData: Record<string, unknown>[]; maxRowIdx: number; maxColIdx: number } | null;
 
@@ -544,6 +641,10 @@ export const UxTable = <DataSource extends unknown[]>(props: UxTableProps<DataSo
                 });
                 tableRef.current?.focus();
             }
+            
+            // 无论粘贴是否成功，都清空 cutBounds 和 copiedBounds
+            setCutBounds(null);
+            setCopiedBounds(null);
         } catch (error) {
             console.error('Paste worker failed:', error);
         }
@@ -644,10 +745,14 @@ export const UxTable = <DataSource extends unknown[]>(props: UxTableProps<DataSo
         const isCopied = copiedBounds && 
             rowIndex >= copiedBounds.top && rowIndex <= copiedBounds.bottom && 
             colIndex >= copiedBounds.left && colIndex <= copiedBounds.right;
-        const isCopiedTop = isCopied && rowIndex === copiedBounds.top;
-        const isCopiedBottom = isCopied && rowIndex === copiedBounds.bottom;
-        const isCopiedLeft = isCopied && colIndex === copiedBounds.left;
-        const isCopiedRight = isCopied && colIndex === copiedBounds.right;
+        const isCut = cutBounds && 
+            rowIndex >= cutBounds.top && rowIndex <= cutBounds.bottom && 
+            colIndex >= cutBounds.left && colIndex <= cutBounds.right;
+
+        const isAntsTop = (isCopied && rowIndex === copiedBounds.top) || (isCut && rowIndex === cutBounds.top);
+        const isAntsBottom = (isCopied && rowIndex === copiedBounds.bottom) || (isCut && rowIndex === cutBounds.bottom);
+        const isAntsLeft = (isCopied && colIndex === copiedBounds.left) || (isCut && colIndex === cutBounds.left);
+        const isAntsRight = (isCopied && colIndex === copiedBounds.right) || (isCut && colIndex === cutBounds.right);
 
         return (
             <div
@@ -694,13 +799,14 @@ export const UxTable = <DataSource extends unknown[]>(props: UxTableProps<DataSo
                     whiteSpace: 'nowrap',
                     cursor: 'cell',
                     display: 'flex',
-                    alignItems: 'center'
+                    alignItems: 'center',
+                    opacity: isCut ? 0.5 : 1
                 }}
             >
-                {isCopiedTop && <div className={styles['marching-ants-top']} />}
-                {isCopiedBottom && <div className={styles['marching-ants-bottom']} />}
-                {isCopiedLeft && <div className={styles['marching-ants-left']} />}
-                {isCopiedRight && <div className={styles['marching-ants-right']} />}
+                {isAntsTop && <div className={styles['marching-ants-top']} />}
+                {isAntsBottom && <div className={styles['marching-ants-bottom']} />}
+                {isAntsLeft && <div className={styles['marching-ants-left']} />}
+                {isAntsRight && <div className={styles['marching-ants-right']} />}
                 
                 {colIndex === 0 && (
                     <div

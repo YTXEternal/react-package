@@ -3,6 +3,60 @@ describe('UxTable 组件', () => {
     cy.visit('/');
     // 等待虚拟列表初始渲染完成
     cy.get('[data-testid="ux-table-header-row"]').should('exist');
+    it('应该支持拖拽选中多个单元格', () => {
+      // 触发 mousedown
+      cy.get('[data-testid="ux-table-cell-0-1"]').trigger('mousedown', { force: true });
+      
+      // 触发 mouseenter 到另一个单元格以扩展选区
+      cy.get('[data-testid="ux-table-cell-1-2"]').trigger('mouseenter', { force: true });
+      
+      // 释放鼠标
+      cy.get('[data-testid="ux-table-cell-1-2"]').trigger('mouseup', { force: true });
+      
+      // 验证选区内的单元格具有正确的背景色
+      cy.get('[data-testid="ux-table-cell-0-1"]').should('have.css', 'background-color').and('include', 'rgb(255, 255, 255)'); // Active cell
+      cy.get('[data-testid="ux-table-cell-0-2"]').should('have.css', 'background-color').and('include', 'rgb(230, 247, 255)'); // Selected
+      cy.get('[data-testid="ux-table-cell-1-1"]').should('have.css', 'background-color').and('include', 'rgb(230, 247, 255)'); // Selected
+      cy.get('[data-testid="ux-table-cell-1-2"]').should('have.css', 'background-color').and('include', 'rgb(230, 247, 255)'); // Selected
+    });
+  });
+
+  describe('粘贴和删除操作测试', () => {
+    it('应该支持粘贴数据并更新表格', () => {
+      cy.get('[data-testid="ux-table-cell-0-1"]').click({ force: true });
+      
+      // 构造要粘贴的文本 (TSV 格式)
+      const pasteText = 'Pasted 1\tPasted 2\nPasted 3\tPasted 4';
+
+      cy.get('[class*="ux-table-main"]').then($main => {
+        // 创建并触发粘贴事件
+        const pasteEvent = new Event('paste', { bubbles: true, cancelable: true });
+        Object.defineProperty(pasteEvent, 'clipboardData', {
+          value: { getData: () => pasteText }
+        });
+        $main[0].dispatchEvent(pasteEvent);
+      });
+
+      // 验证数据是否被正确更新 (等待 Worker 降级执行)
+      cy.wait(100);
+      cy.get('[data-testid="ux-table-cell-0-1"]').should('contain.text', 'Pasted 1');
+      cy.get('[data-testid="ux-table-cell-0-2"]').should('contain.text', 'Pasted 2');
+      cy.get('[data-testid="ux-table-cell-1-1"]').should('contain.text', 'Pasted 3');
+      cy.get('[data-testid="ux-table-cell-1-2"]').should('contain.text', 'Pasted 4');
+    });
+
+    it('应该支持按 Delete 键删除选区内容', () => {
+      // 选中单元格
+      cy.get('[data-testid="ux-table-cell-0-1"]').click({ force: true });
+      
+      // 按下 Delete
+      cy.get('body').type('{del}');
+      
+      // 验证数据被清空 (等待 Worker 降级执行)
+      cy.wait(100);
+      // 空单元格应该不包含原来的文本
+      cy.get('[data-testid="ux-table-cell-0-1"]').should('not.contain.text', 'Pasted 1');
+    });
   });
 
   describe('渲染测试', () => {

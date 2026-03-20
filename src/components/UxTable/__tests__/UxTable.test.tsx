@@ -293,4 +293,210 @@ describe('UxTable Component', () => {
       expect(Array.from(cellElement.children).some(el => el.className.includes('marching-ants-top'))).toBe(false);
     });
   });
+
+  describe('Cut functionality', () => {
+    it('should show marching ants animation and opacity 0.5 when cells are cut', async () => {
+      const user = userEvent.setup();
+      
+      // Setup document execCommand mock
+      const originalExecCommand = document.execCommand;
+      document.execCommand = jest.fn();
+      
+      render(<UxTable columns={columns} data={data} rowKey="key" lineShow={true} isWorker={false} />);
+      
+      const lineNumCell = screen.getByTestId('ux-table-cell-0-0');
+      await user.click(lineNumCell);
+      
+      // Press Ctrl+X to cut
+      fireEvent.keyDown(lineNumCell, { key: 'x', ctrlKey: true });
+      
+      // Verify animation and opacity is applied on data cell
+      const cell01 = screen.getByTestId('ux-table-cell-0-1');
+      const children = Array.from(cell01.children);
+      const hasTopAnts = children.some(el => el.className.includes('marching-ants-top'));
+      expect(hasTopAnts).toBe(true);
+      expect(cell01).toHaveStyle('opacity: 0.5');
+
+      // Restore
+      document.execCommand = originalExecCommand;
+    });
+
+    it('should clear cut animation when Escape is pressed', async () => {
+      const user = userEvent.setup();
+      const { container } = render(<UxTable columns={columns} data={data} rowKey="key" />);
+      
+      const cell01 = screen.getByTestId('ux-table-cell-0-1');
+      const tableMain = container.querySelector('.ux-table-main');
+      
+      // Select cell
+      await user.click(cell01);
+      
+      // Cut
+      fireEvent.keyDown(cell01, { key: 'x', ctrlKey: true });
+      
+      let cellElement = screen.getByTestId('ux-table-cell-0-1');
+      expect(cellElement).toHaveStyle('opacity: 0.5');
+      
+      // Press Escape
+      if (tableMain) {
+          fireEvent.keyDown(tableMain, { key: 'Escape' });
+      }
+      
+      // Verify ants are gone and opacity is 1
+      cellElement = screen.getByTestId('ux-table-cell-0-1');
+      expect(Array.from(cellElement.children).some(el => el.className.includes('marching-ants-top'))).toBe(false);
+      expect(cellElement).toHaveStyle('opacity: 1');
+    });
+  });
+
+  describe('Delete functionality', () => {
+    it('should clear selected cell data and call onDataChange when Delete is pressed', async () => {
+      const user = userEvent.setup();
+      const onDataChange = jest.fn();
+      
+      render(<UxTable columns={columns} data={data} rowKey="key" onDataChange={onDataChange} isWorker={false} />);
+      
+      const cell01 = screen.getByTestId('ux-table-cell-0-1'); // John Doe
+      
+      // Select cell
+      await user.click(cell01);
+      
+      // Press Delete
+      fireEvent.keyDown(cell01, { key: 'Delete' });
+      
+      // Need to wait for postWorkerMessage fallback to resolve
+      await new Promise(resolve => setTimeout(resolve, 0));
+
+      expect(onDataChange).toHaveBeenCalledTimes(1);
+      
+      // The expected data should have 'name' as null for the first row
+      const calledData = onDataChange.mock.calls[0][0];
+      expect(calledData[0].name).toBeNull();
+      expect(calledData[0].age).toBe(30); // untouched
+    });
+  });
+
+  describe('Paste functionality', () => {
+    it('should paste text and call onDataChange', async () => {
+      const user = userEvent.setup();
+      const onDataChange = jest.fn();
+      const { container } = render(<UxTable columns={columns} data={data} rowKey="key" onDataChange={onDataChange} isWorker={false} />);
+      
+      const cell01 = screen.getByTestId('ux-table-cell-0-1');
+      await user.click(cell01);
+
+      const tableMain = container.querySelector('.ux-table-main');
+      
+      // Simulate paste event
+      const pasteEvent = new Event('paste', { bubbles: true, cancelable: true });
+      Object.defineProperty(pasteEvent, 'clipboardData', {
+        value: { getData: jest.fn().mockReturnValue('New John\t35') }
+      });
+      
+      if (tableMain) {
+        fireEvent(tableMain, pasteEvent);
+      }
+      
+      // Wait for async worker fallback
+      await new Promise(resolve => setTimeout(resolve, 0));
+
+      expect(onDataChange).toHaveBeenCalledTimes(1);
+      const calledData = onDataChange.mock.calls[0][0];
+      expect(calledData[0].name).toBe('New John');
+      expect(calledData[0].age).toBe('35');
+    });
+
+    it('should not paste into non-editable columns', async () => {
+      const user = userEvent.setup();
+      const onDataChange = jest.fn();
+      const readonlyColumns: UxTableColumn<DataType>[] = [
+        { title: 'Name', dataIndex: 'name', key: 'name', editable: false },
+        { title: 'Age', dataIndex: 'age', key: 'age', editable: true },
+      ];
+
+      const { container } = render(<UxTable columns={readonlyColumns} data={data} rowKey="key" onDataChange={onDataChange} isWorker={false} />);
+      
+      const cell01 = screen.getByTestId('ux-table-cell-0-1');
+      await user.click(cell01);
+
+      const tableMain = container.querySelector('.ux-table-main');
+      
+      const pasteEvent = new Event('paste', { bubbles: true, cancelable: true });
+      Object.defineProperty(pasteEvent, 'clipboardData', {
+        value: { getData: jest.fn().mockReturnValue('New John\t35') }
+      });
+      
+      if (tableMain) {
+        fireEvent(tableMain, pasteEvent);
+      }
+      
+      await new Promise(resolve => setTimeout(resolve, 0));
+
+      expect(onDataChange).toHaveBeenCalledTimes(1);
+      const calledData = onDataChange.mock.calls[0][0];
+      expect(calledData[0].name).toBe('John Doe'); // unchanged
+      expect(calledData[0].age).toBe('35'); // changed
+    });
+  });
+
+  describe('Drag Selection', () => {
+    it('should select multiple cells when dragging', async () => {
+      render(<UxTable columns={columns} data={data} rowKey="key" />);
+      
+      const cell01 = screen.getByTestId('ux-table-cell-0-1');
+      const cell12 = screen.getByTestId('ux-table-cell-1-2');
+      
+      // Start drag on cell01
+      fireEvent.mouseDown(cell01);
+      // Enter cell12
+      fireEvent.mouseEnter(cell12);
+      
+      // cell 01, 02, 11, 12 should be selected
+      expect(cell01).toHaveStyle('background-color: #ffffff'); // active
+      expect(screen.getByTestId('ux-table-cell-0-2')).toHaveStyle('background-color: #e6f7ff');
+      expect(screen.getByTestId('ux-table-cell-1-1')).toHaveStyle('background-color: #e6f7ff');
+      expect(cell12).toHaveStyle('background-color: #e6f7ff');
+    });
+  });
+
+  describe('Negative Cases', () => {
+    it('should not enter edit mode for non-editable columns', async () => {
+      const user = userEvent.setup();
+      const readonlyColumns: UxTableColumn<DataType>[] = [
+        { title: 'Name', dataIndex: 'name', key: 'name', editable: false },
+        { title: 'Age', dataIndex: 'age', key: 'age', editable: true }
+      ];
+      render(<UxTable columns={readonlyColumns} data={data} rowKey="key" />);
+      
+      const cell01 = screen.getByTestId('ux-table-cell-0-1');
+      await user.dblClick(cell01);
+      
+      // Input should not exist
+      expect(cell01.querySelector('input')).not.toBeInTheDocument();
+    });
+
+    it('should handle empty data gracefully', () => {
+      const { container } = render(<UxTable columns={columns} data={[]} rowKey="key" />);
+      expect(container).toBeInTheDocument();
+      // Should still render headers
+      expect(screen.getByText('Name')).toBeInTheDocument();
+    });
+
+    it('should do nothing on copy if no selection', async () => {
+      const originalExecCommand = document.execCommand;
+      document.execCommand = jest.fn();
+      
+      const { container } = render(<UxTable columns={columns} data={data} rowKey="key" isWorker={false} />);
+      const tableMain = container.querySelector('.ux-table-main');
+      
+      // Press Ctrl+C without selecting anything
+      if (tableMain) {
+        fireEvent.keyDown(tableMain, { key: 'c', ctrlKey: true });
+      }
+      
+      expect(document.execCommand).not.toHaveBeenCalled();
+      
+      document.execCommand = originalExecCommand;
+    });
+  });
 });

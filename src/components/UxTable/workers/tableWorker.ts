@@ -1,4 +1,4 @@
-import { processCopy, processPasteParse, processPaste } from './workerLogic';
+import { processCopy, processPasteParse, processPaste, processDelete } from './workerLogic';
 
 self.onmessage = (e: MessageEvent) => {
     const { id, payload } = e.data;
@@ -18,7 +18,16 @@ self.onmessage = (e: MessageEvent) => {
                 data.sortedData,
                 data.columns,
                 data.startRow,
-                data.startCol
+                data.startCol,
+                data.cutBounds
+            );
+            self.postMessage({ id, result });
+        } else if (type === 'DELETE') {
+            const result = processDelete(
+                data.finalData,
+                data.sortedData,
+                data.columns,
+                data.bounds
             );
             self.postMessage({ id, result });
         } else {
