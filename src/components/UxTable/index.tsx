@@ -112,7 +112,7 @@ const fillGridData = <DataSource extends unknown[]>(
  * @returns {React.ReactElement}
  */
 export const UxTable = <DataSource extends unknown[]>(props: UxTableProps<DataSource>) => {
-    const { columns: propColumns, data: propData, rowKey, className, onDataChange, gridConfig, ref, lineShow = true, infinite } = props;
+    const { columns: propColumns, data: propData, rowKey, className, onDataChange, gridConfig, ref, lineShow = true, infinite, isWorker = true } = props;
     const tableRef = useRef<HTMLDivElement>(null);
 
     const [expandedRows, setExpandedRows] = React.useState(0);
@@ -203,7 +203,7 @@ export const UxTable = <DataSource extends unknown[]>(props: UxTableProps<DataSo
         return createTableWorker();
     }, []);
 
-    const { postMessage: postWorkerMessage } = useWebWorker<WorkerPayload, string | string[][] | null>(workerScript, workerFallback);
+    const { postMessage: postWorkerMessage } = useWebWorker<WorkerPayload, string | string[][] | null>(workerScript, workerFallback, isWorker);
 
     const [copiedBounds, setCopiedBounds] = React.useState<{top: number, bottom: number, left: number, right: number} | null>(null);
 

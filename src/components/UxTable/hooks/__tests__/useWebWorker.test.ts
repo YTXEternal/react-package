@@ -19,7 +19,8 @@ describe('useWebWorker', () => {
 
     it('should fallback to main thread if window.Worker is not defined', async () => {
         const originalWorker = window.Worker;
-        // @ts-ignore
+         
+        // @ts-expect-error Mocking window.Worker removal for testing
         delete window.Worker;
 
         const fallback = jest.fn().mockResolvedValue('fallback_result');

@@ -54,15 +54,24 @@ const generateData = (rows: number, cols: number): DataType[] => {
     }
     // 添加数字列数据，故意打乱顺序并混入 null
     item['num_col'] = i % 3 === 0 ? null : (rows - i) * 10;
+    
+    // 如果是性能测试，将所有单元格的值设置为 100 以简化和符合需求
+    if (window.location.search.includes('perf=true')) {
+        for (let j = 0; j < cols; j++) {
+            item[`col_${j}`] = '100';
+        }
+        item['num_col'] = '100';
+    }
+    
     data.push(item);
   }
   return data;
 };
 
 function App() {
-  // 使用 useMemo 缓存初始数据，避免重复生成
-  const initialData = useMemo(() => generateData(6, 20), []);
-  const initialColumns = useMemo(() => generateColumns(20), []);
+  const isPerfTest = window.location.search.includes('perf=true');
+  const initialData = useMemo(() => isPerfTest ? generateData(999, 999) : generateData(6, 20), [isPerfTest]);
+  const initialColumns = useMemo(() => isPerfTest ? generateColumns(999) : generateColumns(20), [isPerfTest]);
 
   const [data, setData] = useState(initialData);
 
@@ -84,6 +93,7 @@ function App() {
           infinite={{ row: 10, col: 5, gap: 5 }}
           style={{ height: '100%' }}
           lineShow={true}
+          isWorker={window.location.search.includes('isWorker=false') ? false : true}
         />
       </div>
     </div>

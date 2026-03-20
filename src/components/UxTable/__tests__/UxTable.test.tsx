@@ -102,7 +102,7 @@ describe('UxTable Component', () => {
 
   it('selects all cells when Ctrl+A is pressed', async () => {
     const user = userEvent.setup();
-    render(<UxTable columns={columns} data={data} rowKey="key" />);
+    render(<UxTable columns={columns} data={data} rowKey="key" isWorker={false} />);
     
     // First col is line number, start with second col
     const cell01 = screen.getByTestId('ux-table-cell-0-1');
@@ -220,7 +220,7 @@ describe('UxTable Component', () => {
       const originalExecCommand = document.execCommand;
       document.execCommand = jest.fn();
       
-      render(<UxTable columns={columns} data={data} rowKey="key" lineShow={true} />);
+      render(<UxTable columns={columns} data={data} rowKey="key" lineShow={true} isWorker={false} />);
       
       // Select the entire row using line number cell
       const lineNumCell = screen.getByTestId('ux-table-cell-0-0');
