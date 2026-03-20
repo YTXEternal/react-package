@@ -1,8 +1,8 @@
 import { processCopy, processPasteParse, processPaste, processDelete } from '../workerLogic';
 
-describe('workerLogic', () => {
-    describe('processCopy', () => {
-        it('should correctly process data and columns to a tab-separated string', () => {
+describe('workerLogic 算法逻辑', () => {
+    describe('processCopy 复制处理', () => {
+        it('应该正确地将数据和列配置处理为制表符分隔的字符串', () => {
             const data = [
                 { name: 'John', age: 30, hidden: 'secret' },
                 { name: 'Jane', age: 25, hidden: 'secret2' }
@@ -16,7 +16,7 @@ describe('workerLogic', () => {
             expect(result).toBe('John\t30\nJane\t25');
         });
 
-        it('should skip _line_number_ column', () => {
+        it('应该跳过 _line_number_ 行号列', () => {
             const data = [{ name: 'John', age: 30 }];
             const columns = [
                 { key: '_line_number_', dataIndex: 'id' },
@@ -27,7 +27,7 @@ describe('workerLogic', () => {
             expect(result).toBe('John');
         });
 
-        it('should handle null and undefined values as empty strings', () => {
+        it('应该将 null 和 undefined 值处理为空字符串', () => {
             const data = [{ name: 'John', age: null, address: undefined }];
             const columns = [
                 { key: 'name', dataIndex: 'name' },
@@ -40,8 +40,8 @@ describe('workerLogic', () => {
         });
     });
 
-    describe('processDelete', () => {
-        it('should correctly delete specified bounds and set values to null', () => {
+    describe('processDelete 删除处理', () => {
+        it('应该正确删除指定边界内的数据并设为 null', () => {
             const finalData = [
                 { name: 'John', age: 30, id: 1 },
                 { name: 'Jane', age: 25, id: 2 },
@@ -65,7 +65,7 @@ describe('workerLogic', () => {
             ]);
         });
 
-        it('should respect column editable false property and skip _line_number_ column', () => {
+        it('应该尊重列的 editable:false 属性并跳过行号列', () => {
             const finalData = [
                 { name: 'John', age: 30, id: 1 }
             ];
@@ -85,7 +85,7 @@ describe('workerLogic', () => {
             ]);
         });
 
-        it('should return null if no valid changes', () => {
+        it('如果没有有效更改则应该返回 null', () => {
             const finalData = [{ name: 'John' }];
             const columns = [{ editable: false, dataIndex: 'name' }];
             const bounds = { top: 0, bottom: 0, left: 0, right: 0 };
@@ -95,8 +95,8 @@ describe('workerLogic', () => {
         });
     });
 
-    describe('processPasteParse', () => {
-        it('should correctly parse tab and newline separated string into 2D array', () => {
+    describe('processPasteParse 粘贴解析处理', () => {
+        it('应该正确地将制表符和换行符分隔的字符串解析为二维数组', () => {
             const text = 'John\t30\nJane\t25';
             const result = processPasteParse(text);
             expect(result).toEqual([
@@ -105,7 +105,7 @@ describe('workerLogic', () => {
             ]);
         });
 
-        it('should ignore empty lines', () => {
+        it('应该忽略空行', () => {
             const text = 'John\t30\n\nJane\t25\n';
             const result = processPasteParse(text);
             expect(result).toEqual([
@@ -115,8 +115,8 @@ describe('workerLogic', () => {
         });
     });
 
-    describe('processPaste', () => {
-        it('should correctly update data with pasted text', () => {
+    describe('processPaste 粘贴覆盖处理', () => {
+        it('应该使用粘贴的文本正确更新数据', () => {
             const text = 'NewJohn\t35\nNewJane\t28';
             const finalData = [
                 { name: 'John', age: 30 },
@@ -141,7 +141,7 @@ describe('workerLogic', () => {
             ]);
         });
 
-        it('should respect column editable false property', () => {
+        it('应该尊重列的 editable:false 属性', () => {
             const text = 'NewJohn\t35';
             const finalData = [
                 { name: 'John', age: 30 }
@@ -160,7 +160,7 @@ describe('workerLogic', () => {
             ]);
         });
 
-        it('should clear cutBounds if provided before pasting', () => {
+        it('如果粘贴前提供了剪切边界，应该先清除剪切边界内的数据', () => {
             const text = 'NewJohn\t35';
             const finalData = [
                 { name: 'John', age: 30 },
@@ -182,7 +182,7 @@ describe('workerLogic', () => {
             ]);
         });
 
-        it('should clear cutBounds even if pasted text overwrites the same cells', () => {
+        it('即使粘贴的文本覆盖了相同的单元格，也应该正确应用', () => {
             const text = 'NewJohn\t35';
             const finalData = [
                 { name: 'John', age: 30 }
@@ -202,7 +202,7 @@ describe('workerLogic', () => {
             ]);
         });
 
-        it('should return null if text is empty or no valid changes', () => {
+        it('如果文本为空或没有有效更改则应该返回 null', () => {
             const finalData = [{ name: 'John' }];
             const columns = [{ editable: true, dataIndex: 'name' }];
             

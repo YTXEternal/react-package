@@ -60,11 +60,37 @@ describe('UxTable 性能测试', () => {
         });
     };
 
-    it('测试使用 Web Worker 在大规模数据下的复制与粘贴耗时', () => {
+    it('测试使用 Web Worker 在大规模数据下的复制与粘贴耗时（负载测试）', () => {
         measureAction('/?perf=true', 'With Worker');
     });
 
-    it('测试不使用 Web Worker (降级主线程) 在大规模数据下的复制与粘贴耗时', () => {
+    it('测试不使用 Web Worker (降级主线程) 在大规模数据下的复制与粘贴耗时（负载测试）', () => {
         measureAction('/?perf=true&isWorker=false', 'Without Worker');
+    });
+
+    it('测试高频滚动和交互的稳定性（压力与稳定性测试）', () => {
+        cy.visit('/'); // 返回普通的测试页，防止 perf 页面规模过大导致 DOM 查找超时
+        cy.get('[data-testid="ux-table-header-row"]', { timeout: 10000 }).should('exist');
+
+        // 使用类名查找表格容器
+        cy.get('[class*="ux-table-main"]').first().as('tableMain');
+        cy.get('@tableMain').should('be.visible');
+
+        // 模拟连续的快速滚动（压力测试）
+        for (let i = 0; i < 5; i++) {
+            cy.get('@tableMain').scrollTo(0, i * 200, { ensureScrollable: false, duration: 50 });
+            cy.get('@tableMain').scrollTo(i * 100, 0, { ensureScrollable: false, duration: 50 });
+        }
+
+        // 验证滚动后没有崩溃
+        cy.get('@tableMain').should('be.visible');
+        
+        // 模拟快速的连续点击选区（压力测试）
+        for (let i = 0; i < 5; i++) {
+            cy.get(`[data-testid="ux-table-cell-${i}-1"]`).click({ force: true });
+        }
+
+        // 验证系统依然响应
+        cy.get('[data-testid="ux-table-cell-4-1"]').should('have.css', 'background-color').and('include', 'rgb(255, 255, 255)');
     });
 });

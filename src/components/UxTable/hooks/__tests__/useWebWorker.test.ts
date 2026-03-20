@@ -1,8 +1,8 @@
 import { renderHook, act } from '@testing-library/react';
 import { useWebWorker } from '../useWebWorker';
 
-describe('useWebWorker', () => {
-    it('should fallback to main thread if worker is null', async () => {
+describe('useWebWorker 自定义钩子', () => {
+    it('如果 worker 返回 null，应该降级到主线程执行', async () => {
         const fallback = jest.fn().mockResolvedValue('fallback_result');
         const workerScript = () => null;
 
@@ -17,7 +17,7 @@ describe('useWebWorker', () => {
         expect(res).toBe('fallback_result');
     });
 
-    it('should fallback to main thread if window.Worker is not defined', async () => {
+    it('如果 window.Worker 未定义，应该降级到主线程执行', async () => {
         const originalWorker = window.Worker;
          
         // @ts-expect-error Mocking window.Worker removal for testing

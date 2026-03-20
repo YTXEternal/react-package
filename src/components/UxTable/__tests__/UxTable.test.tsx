@@ -47,7 +47,7 @@ interface DataType {
 }
 
 
-describe('UxTable Component', () => {
+describe('UxTable 组件', () => {
   const columns: UxTableColumn<DataType>[] = [
     { title: 'Name', dataIndex: 'name', key: 'name' },
     { title: 'Age', dataIndex: 'age', key: 'age' },
@@ -58,7 +58,7 @@ describe('UxTable Component', () => {
     { key: '2', name: 'Jane Doe', age: 25 },
   ];
 
-  it('renders line numbers when lineShow is true (default)', () => {
+  it('当 lineShow 为 true (默认值) 时渲染行号', () => {
     // The render function in the mock returns what we rendered. The line number column renders 1 and 2
     render(<UxTable columns={columns} data={data} rowKey="key" lineShow={true} />);
     // The render function of the line number column uses ReactNode, let's find it by testid
@@ -67,20 +67,20 @@ describe('UxTable Component', () => {
     expect(screen.getByTestId('ux-table-cell-1-0')).toHaveTextContent('2');
   });
 
-  it('does not render line numbers when lineShow is false', () => {
+  it('当 lineShow 为 false 时不渲染行号', () => {
     render(<UxTable columns={columns} data={data} rowKey="key" lineShow={false} />);
     // If lineShow is false, cell-0-0 should be "John Doe", not "1"
     expect(screen.getByTestId('ux-table-cell-0-0')).toHaveTextContent('John Doe');
   });
 
-  it('renders table headers correctly', () => {
+  it('正确渲染表头', () => {
     render(<UxTable columns={columns} data={data} rowKey="key" />);
     
     expect(screen.getByText('Name')).toBeInTheDocument();
     expect(screen.getByText('Age')).toBeInTheDocument();
   });
 
-  it('renders table data correctly', () => {
+  it('正确渲染表格数据', () => {
     render(<UxTable columns={columns} data={data} rowKey="key" />);
     
     expect(screen.getByText('John Doe')).toBeInTheDocument();
@@ -89,7 +89,7 @@ describe('UxTable Component', () => {
     expect(screen.getByText('25')).toBeInTheDocument();
   });
 
-  it('pads data to match gridConfig and fills missing values with null', () => {
+  it('补齐数据以匹配 gridConfig 并用 null 填充缺失值', () => {
     const gridConfig = { rows: 3, cols: 3 };
     const testData = [{ key: '1', name: 'John Doe' }] as DataType[];
     // lineShow = false to match original grid testing layout exactly
@@ -100,7 +100,7 @@ describe('UxTable Component', () => {
     expect(screen.getByText('3')).toBeInTheDocument();
   });
 
-  it('selects all cells when Ctrl+A is pressed', async () => {
+  it('当按下 Ctrl+A 时全选所有单元格', async () => {
     const user = userEvent.setup();
     render(<UxTable columns={columns} data={data} rowKey="key" isWorker={false} />);
     
@@ -123,7 +123,7 @@ describe('UxTable Component', () => {
     expect(cell02).toHaveStyle('background-color: #e6f7ff'); 
   });
 
-  it('selects column when clicking on column header', async () => {
+  it('点击表头时选中整列', async () => {
     const user = userEvent.setup();
     render(<UxTable columns={columns} data={data} rowKey="key" />);
     
@@ -141,7 +141,7 @@ describe('UxTable Component', () => {
     expect(cell11).toHaveStyle({ backgroundColor: '#e6f7ff' });
   });
 
-  it('selects row when clicking on line number cell', async () => {
+  it('点击行号单元格时选中整行', async () => {
     const user = userEvent.setup();
     render(<UxTable columns={columns} data={data} rowKey="key" lineShow={true} />);
     
@@ -161,7 +161,7 @@ describe('UxTable Component', () => {
     expect(cell02).toHaveStyle('background-color: #e6f7ff');
   });
 
-  it('triggers sort only when sort icon is clicked', async () => {
+  it('仅当点击排序图标时触发排序', async () => {
     const sortableColumns: UxTableColumn<DataType>[] = [
       { title: 'Name', dataIndex: 'name', key: 'name', sorter: true }
     ];
@@ -181,7 +181,7 @@ describe('UxTable Component', () => {
     expect(screen.getByTestId('ux-table-cell-0-0')).toHaveTextContent('Jane Doe');
   });
 
-  it('expands rows and columns when infinite prop is provided', () => {
+  it('提供 infinite 属性时扩充行和列', () => {
     const infinite = { row: 5, col: 5, gap: 2 };
     
     // We start with 2 data rows. Target rows = 2.
@@ -202,7 +202,7 @@ describe('UxTable Component', () => {
     expect(screen.getByTestId('ux-table-header-cell-4')).toHaveTextContent('5');
   });
 
-  it('formats column header text when infinite.headerText is provided', () => {
+  it('提供 infinite.headerText 时格式化表头文本', () => {
     const infinite = { row: 5, col: 5, gap: 2, headerText: (index: number) => `Col ${index}` };
     
     render(<UxTable columns={columns} data={data} rowKey="key" infinite={infinite} />);
@@ -212,8 +212,8 @@ describe('UxTable Component', () => {
     expect(screen.getByText('Col 4')).toBeInTheDocument();
   });
 
-  describe('Copy functionality with marching ants animation', () => {
-    it('should show marching ants animation when cells are copied and exclude line numbers', async () => {
+  describe('带蚂蚁线动画的复制功能', () => {
+    it('复制单元格时显示蚂蚁线动画并排除行号列', async () => {
       const user = userEvent.setup();
       
       // Setup document execCommand mock
@@ -242,7 +242,7 @@ describe('UxTable Component', () => {
       document.execCommand = originalExecCommand;
     });
 
-    it('should clear marching ants animation when Escape is pressed', async () => {
+    it('按下 Escape 键时清除蚂蚁线动画', async () => {
       const user = userEvent.setup();
       const { container } = render(<UxTable columns={columns} data={data} rowKey="key" />);
       
@@ -269,7 +269,7 @@ describe('UxTable Component', () => {
       expect(Array.from(cellElement.children).some(el => el.className.includes('marching-ants-top'))).toBe(false);
     });
 
-    it('should clear marching ants animation when entering edit mode', async () => {
+    it('进入编辑模式时清除蚂蚁线动画', async () => {
       const user = userEvent.setup();
       render(<UxTable columns={columns} data={data} rowKey="key" />);
       
@@ -294,8 +294,8 @@ describe('UxTable Component', () => {
     });
   });
 
-  describe('Cut functionality', () => {
-    it('should show marching ants animation and opacity 0.5 when cells are cut', async () => {
+  describe('剪切功能', () => {
+    it('剪切单元格时显示蚂蚁线动画和 0.5 的不透明度', async () => {
       const user = userEvent.setup();
       
       // Setup document execCommand mock
@@ -321,7 +321,7 @@ describe('UxTable Component', () => {
       document.execCommand = originalExecCommand;
     });
 
-    it('should clear cut animation when Escape is pressed', async () => {
+    it('按下 Escape 键时清除剪切动画', async () => {
       const user = userEvent.setup();
       const { container } = render(<UxTable columns={columns} data={data} rowKey="key" />);
       
@@ -349,8 +349,8 @@ describe('UxTable Component', () => {
     });
   });
 
-  describe('Delete functionality', () => {
-    it('should clear selected cell data and call onDataChange when Delete is pressed', async () => {
+  describe('删除功能', () => {
+    it('按下 Delete 键时清除选中单元格数据并调用 onDataChange', async () => {
       const user = userEvent.setup();
       const onDataChange = jest.fn();
       
@@ -376,8 +376,8 @@ describe('UxTable Component', () => {
     });
   });
 
-  describe('Paste functionality', () => {
-    it('should paste text and call onDataChange', async () => {
+  describe('粘贴功能', () => {
+    it('应该粘贴文本并调用 onDataChange', async () => {
       const user = userEvent.setup();
       const onDataChange = jest.fn();
       const { container } = render(<UxTable columns={columns} data={data} rowKey="key" onDataChange={onDataChange} isWorker={false} />);
@@ -406,7 +406,7 @@ describe('UxTable Component', () => {
       expect(calledData[0].age).toBe('35');
     });
 
-    it('should not paste into non-editable columns', async () => {
+    it('不应该粘贴到不可编辑的列', async () => {
       const user = userEvent.setup();
       const onDataChange = jest.fn();
       const readonlyColumns: UxTableColumn<DataType>[] = [
@@ -439,8 +439,8 @@ describe('UxTable Component', () => {
     });
   });
 
-  describe('Drag Selection', () => {
-    it('should select multiple cells when dragging', async () => {
+  describe('拖拽选择', () => {
+    it('拖拽时应选中多个单元格', async () => {
       render(<UxTable columns={columns} data={data} rowKey="key" />);
       
       const cell01 = screen.getByTestId('ux-table-cell-0-1');
@@ -459,8 +459,8 @@ describe('UxTable Component', () => {
     });
   });
 
-  describe('Negative Cases', () => {
-    it('should not enter edit mode for non-editable columns', async () => {
+  describe('异常用例', () => {
+    it('对于不可编辑的列不应进入编辑模式', async () => {
       const user = userEvent.setup();
       const readonlyColumns: UxTableColumn<DataType>[] = [
         { title: 'Name', dataIndex: 'name', key: 'name', editable: false },
@@ -475,14 +475,14 @@ describe('UxTable Component', () => {
       expect(cell01.querySelector('input')).not.toBeInTheDocument();
     });
 
-    it('should handle empty data gracefully', () => {
+    it('应优雅地处理空数据', () => {
       const { container } = render(<UxTable columns={columns} data={[]} rowKey="key" />);
       expect(container).toBeInTheDocument();
       // Should still render headers
       expect(screen.getByText('Name')).toBeInTheDocument();
     });
 
-    it('should do nothing on copy if no selection', async () => {
+    it('如果没有选区则复制操作不应执行任何操作', async () => {
       const originalExecCommand = document.execCommand;
       document.execCommand = jest.fn();
       
