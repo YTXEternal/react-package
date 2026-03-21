@@ -51,6 +51,7 @@ React 性能下降通常由以下几个核心原因导致：
 - 使用了 Barrel files (如 `import { x } from './utils'`) 导致 Tree Shaking 失败，打包了整个模块。
 
 **✅ 优化方案：**
+
 - **组件懒加载 (Lazy Loading)**：使用 `React.lazy()` + `<Suspense>` 或 `next/dynamic` 动态引入非首屏、低频交互的组件。
 - **直接引入特定模块**：尽量避免 Barrel 引入，直接引入具体路径，例如 `import debounce from 'lodash/debounce'`。
 - **条件加载第三方脚本**：对于分析、客服插件等第三方库，在其需要时或页面闲置时再进行加载 (`defer` / `async`)。
