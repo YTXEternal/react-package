@@ -1,13 +1,14 @@
 import { useMemo } from 'react';
-import type { UxTableColumn } from '../types';
+import type { UxTableColumn } from '../../types';
+import type { ColumnOffset } from './types';
 
 export const useFixedColumns = <DataSource extends unknown[]>(
     columns: UxTableColumn<DataSource[number]>[]
-) => {
+): ColumnOffset[] => {
     return useMemo(() => {
         let leftOffset = 0;
         let rightOffset = 0;
-        const offsets: { left?: number; right?: number; isLastLeft?: boolean; isFirstRight?: boolean }[] = [];
+        const offsets: ColumnOffset[] = [];
 
         let lastLeftIndex = -1;
         for (let i = 0; i < columns.length; i++) {
@@ -18,7 +19,9 @@ export const useFixedColumns = <DataSource extends unknown[]>(
                 lastLeftIndex = i;
             }
         }
-        if (lastLeftIndex !== -1) offsets[lastLeftIndex].isLastLeft = true;
+        if (lastLeftIndex !== -1 && offsets[lastLeftIndex]) {
+            offsets[lastLeftIndex].isLastLeft = true;
+        }
 
         let firstRightIndex = -1;
         for (let i = columns.length - 1; i >= 0; i--) {
@@ -29,7 +32,9 @@ export const useFixedColumns = <DataSource extends unknown[]>(
                 firstRightIndex = i;
             }
         }
-        if (firstRightIndex !== -1) offsets[firstRightIndex].isFirstRight = true;
+        if (firstRightIndex !== -1 && offsets[firstRightIndex]) {
+            offsets[firstRightIndex].isFirstRight = true;
+        }
 
         return offsets;
     }, [columns]);

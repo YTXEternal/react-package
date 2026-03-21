@@ -1,44 +1,9 @@
 import React, { memo } from 'react';
-import type { UxTableColumn } from '../types';
-import { CellEditor } from './CellEditor';
-import styles from '../styles.module.css';
+import { CellEditor } from '../CellEditor';
+import styles from '../../styles.module.css';
+import type { BodyCellProps } from './types';
 
-interface BodyCellProps<DataSource extends unknown[]> {
-    rowIndex: number;
-    colIndex: number;
-    virtualStart: number;
-    virtualSize: number;
-    record: DataSource[number];
-    value: unknown;
-    column: UxTableColumn<DataSource[number]>;
-    isFixed: 'left' | 'right' | false | undefined;
-    offset: { left?: number; right?: number; isLastLeft?: boolean; isFirstRight?: boolean } | undefined;
-    isSelected: boolean;
-    isActive: boolean;
-    isEditing: boolean;
-    isLineNumberCol: boolean;
-    columnsLength: number;
-    selectionBounds: { top: number; bottom: number; left: number; right: number } | null;
-    isRowSelectionMode: boolean;
-    
-    // Ant properties
-    isAntsTop: boolean;
-    isAntsBottom: boolean;
-    isAntsLeft: boolean;
-    isAntsRight: boolean;
-    isCut: boolean;
-
-    // Handlers
-    handleCellMouseDown: (e: React.MouseEvent, rowIndex: number, colIndex: number, colCount: number, isLineNumberCol: boolean) => void;
-    handleCellMouseEnter: (rowIndex: number, colIndex: number, colCount: number, isLineNumberCol: boolean) => void;
-    handleRowResizeMouseDown: (e: React.MouseEvent, rowIndex: number) => void;
-    startEditing: (rowIndex: number, colIndex: number) => void;
-    saveEdit: (value: string) => void;
-    cancelEdit: () => void;
-    initialEditValue: string;
-}
-
-const BodyCellInner = <DataSource extends unknown[]>({
+const BodyCellInner = <RecordType,>({
     rowIndex,
     colIndex,
     virtualStart,
@@ -67,7 +32,7 @@ const BodyCellInner = <DataSource extends unknown[]>({
     saveEdit,
     cancelEdit,
     initialEditValue
-}: BodyCellProps<DataSource>) => {
+}: BodyCellProps<RecordType>) => {
     const colKey = column.key || String(column.dataIndex) || colIndex;
 
     const buildBoxShadow = () => {

@@ -1,12 +1,13 @@
 import { useCallback } from 'react';
+import type { UseClipboardReturn } from './types';
 
 /**
  * 提供跨浏览器兼容的剪贴板操作 Hook
  * 兼容 Chrome, Firefox, Edge, Safari 等主流浏览器
  * 
- * @returns {{ copyToClipboard: (text: string) => Promise<boolean> }}
+ * @returns {UseClipboardReturn}
  */
-export const useClipboard = () => {
+export const useClipboard = (): UseClipboardReturn => {
     /**
      * 降级复制方案，使用 execCommand
      * 用于不支持 navigator.clipboard 的旧版浏览器或不安全环境

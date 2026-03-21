@@ -1,10 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-
-interface CellEditorProps {
-    initialValue: string;
-    onSave: (value: string) => void;
-    onCancel: () => void;
-}
+import type { CellEditorProps } from './types';
 
 export const CellEditor: React.FC<CellEditorProps> = ({ initialValue, onSave, onCancel }) => {
     const [editValue, setEditValue] = useState(initialValue);

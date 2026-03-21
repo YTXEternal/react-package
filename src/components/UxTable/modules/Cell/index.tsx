@@ -1,26 +1,7 @@
 import React from 'react';
-import type { UxTableColumn } from '../types';
+import type { CellProps } from './types';
 
-interface CellProps<DataSource extends unknown[]> {
-    record: DataSource[number];
-    column: UxTableColumn<DataSource[number]>;
-    rowIndex: number;
-    colIndex: number;
-    fixedOffset?: { left?: number; right?: number; isLastLeft?: boolean; isFirstRight?: boolean };
-    isSelected: boolean;
-    isActive: boolean;
-    isEditing: boolean;
-    editValue: string;
-    tableRef: React.RefObject<HTMLDivElement | null>;
-    onMouseDown: (e: React.MouseEvent) => void;
-    onMouseEnter: () => void;
-    onDoubleClick: () => void;
-    onEditChange: (value: string) => void;
-    onEditSave: () => void;
-    onEditCancel: () => void;
-}
-
-export const Cell = <DataSource extends unknown[]>({
+export const Cell = <RecordType,>({
     record,
     column,
     rowIndex,
@@ -35,7 +16,7 @@ export const Cell = <DataSource extends unknown[]>({
     onEditChange,
     onEditSave,
     onEditCancel
-}: CellProps<DataSource>) => {
+}: CellProps<RecordType>) => {
     const value = (record as Record<string, unknown>)[column.dataIndex as string];
     const isFixed = column.fixed;
 
@@ -83,9 +64,6 @@ export const Cell = <DataSource extends unknown[]>({
                         } else if (e.key === 'Escape') {
                             isCancelingRef.current = true;
                             onEditCancel();
-                            // tableRef focus is handled by onEditCancel callback in parent or here?
-                            // In UxTable.tsx, onEditCancel does focus.
-                            // But let's keep it consistent.
                         }
                     }}
                     style={{

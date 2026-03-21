@@ -1,10 +1,11 @@
 import { useState, useRef } from 'react';
-import type { UxTableColumn } from '../types';
+import type { UxTableColumn } from '../../types';
+import type { UseResizingReturn } from './types';
 
 export const useResizing = <DataSource extends unknown[]>(
     propColumns: UxTableColumn<DataSource[number]>[]
-) => {
-    const [columns, setColumns] = useState(() => propColumns.map(col => ({
+): UseResizingReturn<DataSource[number]> => {
+    const [columns, setColumns] = useState<UxTableColumn<DataSource[number]>[]>(() => propColumns.map(col => ({
         ...col,
         width: typeof col.width === 'number' ? col.width : (col.width ? parseInt(col.width as string, 10) : undefined)
     })));
@@ -28,7 +29,7 @@ export const useResizing = <DataSource extends unknown[]>(
         e.stopPropagation();
         resizingColIndexRef.current = index;
         startXRef.current = e.clientX;
-        startWidthRef.current = columns[index].width || (e.target as HTMLElement).parentElement?.offsetWidth || 100;
+        startWidthRef.current = columns[index].width as number || (e.target as HTMLElement).parentElement?.offsetWidth || 100;
 
         document.addEventListener('mousemove', handleResizeMouseMove);
         document.addEventListener('mouseup', handleResizeMouseUp);

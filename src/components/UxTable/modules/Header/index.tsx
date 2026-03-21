@@ -1,22 +1,13 @@
 import React from 'react';
-import type { UxTableColumn } from '../types';
-import type { SortState } from '../hooks/useSorting';
+import type { HeaderProps } from './types';
 
-interface HeaderProps<DataSource extends unknown[]> {
-    columns: UxTableColumn<DataSource[number]>[];
-    sortState: SortState | null;
-    fixedOffsets: { left?: number; right?: number; isLastLeft?: boolean; isFirstRight?: boolean }[];
-    onSort: (index: number) => void;
-    onResizeMouseDown: (e: React.MouseEvent, index: number) => void;
-}
-
-export const Header = <DataSource extends unknown[]>({
+export const Header = <RecordType,>({
     columns,
     sortState,
     fixedOffsets,
     onSort,
     onResizeMouseDown
-}: HeaderProps<DataSource>) => {
+}: HeaderProps<RecordType>) => {
     return (
         <thead>
             <tr>

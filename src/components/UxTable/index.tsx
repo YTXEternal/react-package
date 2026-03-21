@@ -8,6 +8,7 @@ import { useFixedColumns } from './hooks/useFixedColumns';
 import { useClipboard } from './hooks/useClipboard';
 import { useWebWorker } from './hooks/useWebWorker';
 import { processCopy, processPasteParse, processPaste, processDelete } from './workers/workerLogic';
+import type { WorkerPayload, WorkerResult } from './workers/types';
 import { createTableWorker } from './workers/createWorker';
 import { useVirtualizer, defaultRangeExtractor } from '@tanstack/react-virtual';
 import type { VirtualItem } from '@tanstack/react-virtual';
@@ -146,7 +147,7 @@ export const UxTable = <DataSource extends unknown[]>(props: UxTableProps<DataSo
         // 如果开启 lineShow，在最前面插入行号列
         if (lineShow) {
             columns.unshift({
-                title: '',
+                title: '行',
                 dataIndex: '_line_number_' as keyof DataSource[number],
                 key: '_line_number_',
                 width: 50,
@@ -202,38 +203,32 @@ export const UxTable = <DataSource extends unknown[]>(props: UxTableProps<DataSo
     const { copyToClipboard } = useClipboard();
 
     // 初始化 Web Worker
-    type WorkerPayload =
-        | { type: 'COPY'; data: { selectedData: Record<string, unknown>[]; columns: { key?: React.Key; dataIndex: string | number | symbol }[] } }
-        | { type: 'PASTE_PARSE'; data: { text: string } }
-        | { type: 'PASTE'; data: { text: string; finalData: Record<string, unknown>[]; sortedData: Record<string, unknown>[]; columns: { editable?: boolean; dataIndex: string | number | symbol; key?: React.Key }[]; startRow: number; startCol: number; cutBounds?: { top: number; bottom: number; left: number; right: number } | null } }
-        | { type: 'DELETE'; data: { finalData: Record<string, unknown>[]; sortedData: Record<string, unknown>[]; columns: { editable?: boolean; dataIndex: string | number | symbol; key?: React.Key }[]; bounds: { top: number; bottom: number; left: number; right: number } } };
-
     /**
      * Web Worker 回调策略处理，使用策略模式优化不同的 worker 任务
      * @param {WorkerPayload} payload 传递给 worker 的数据
      * @returns {Promise<unknown>}
      */
-    const workerFallback = React.useCallback(async (payload: WorkerPayload) => {
-        const strategies = {
-            COPY: (data: Extract<WorkerPayload, { type: 'COPY' }>['data']) =>
-                processCopy(data.selectedData, data.columns as { key?: string | number | symbol; dataIndex: string | number | symbol }[]),
-            PASTE_PARSE: (data: Extract<WorkerPayload, { type: 'PASTE_PARSE' }>['data']) =>
+    const workerFallback = React.useCallback(async (payload: WorkerPayload): Promise<WorkerResult> => {
+        const strategies: { [K in WorkerPayload['type']]: (data: Extract<WorkerPayload, { type: K }>['data']) => WorkerResult } = {
+            COPY: (data) =>
+                processCopy(data.selectedData, data.columns),
+            PASTE_PARSE: (data) =>
                 processPasteParse(data.text),
-            PASTE: (data: Extract<WorkerPayload, { type: 'PASTE' }>['data']) =>
+            PASTE: (data) =>
                 processPaste(
                     data.text,
                     data.finalData,
                     data.sortedData,
-                    data.columns as { editable?: boolean; dataIndex: string | number | symbol; key?: string | number | symbol }[],
+                    data.columns,
                     data.startRow,
                     data.startCol,
                     data.cutBounds
                 ),
-            DELETE: (data: Extract<WorkerPayload, { type: 'DELETE' }>['data']) =>
+            DELETE: (data) =>
                 processDelete(
                     data.finalData,
                     data.sortedData,
-                    data.columns as { editable?: boolean; dataIndex: string | number | symbol; key?: string | number | symbol }[],
+                    data.columns,
                     data.bounds
                 )
         };
@@ -241,15 +236,15 @@ export const UxTable = <DataSource extends unknown[]>(props: UxTableProps<DataSo
         const strategy = strategies[payload.type as keyof typeof strategies];
         if (!strategy) return null; // 卫语句：找不到对应策略时返回 null
 
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        return strategy(payload.data as any);
+        // 根据 payload 的 type，将 payload.data 传递给对应的策略
+        return (strategy as (data: unknown) => WorkerResult)(payload.data);
     }, []);
 
     const workerScript = React.useCallback(() => {
         return createTableWorker();
     }, []);
 
-    const { postMessage: postWorkerMessage } = useWebWorker<WorkerPayload, string | string[][] | { newData: Record<string, unknown>[]; maxRowIdx?: number; maxColIdx?: number } | null>(workerScript, workerFallback, isWorker);
+    const { postMessage: postWorkerMessage } = useWebWorker<WorkerPayload, WorkerResult>(workerScript, workerFallback, isWorker);
 
     const [copiedBounds, setCopiedBounds] = React.useState<{ top: number, bottom: number, left: number, right: number } | null>(null);
     const [cutBounds, setCutBounds] = React.useState<{ top: number, bottom: number, left: number, right: number } | null>(null);
@@ -390,10 +385,9 @@ export const UxTable = <DataSource extends unknown[]>(props: UxTableProps<DataSo
 
         const handleMouseMove = (moveEvent: MouseEvent) => {
             if (!resizingRowRef.current) return;
-
             const deltaY = moveEvent.clientY - resizingRowRef.current.startY;
             const newHeight = Math.max(20, resizingRowRef.current.startHeight + deltaY); // 最小行高限制
-
+            
             setRowHeights(prev => ({
                 ...prev,
                 [rowIndex]: newHeight
@@ -874,7 +868,9 @@ export const UxTable = <DataSource extends unknown[]>(props: UxTableProps<DataSo
                                     zIndex: (selectionBounds && rowIndex >= selectionBounds.top && rowIndex <= selectionBounds.bottom) ? 2 : 1 // 提升包含选中单元格的行的层级
                                 }}
                             >
-                                {colVirtualizer.getVirtualItems().map(virtualCol => renderBodyCell(virtualCol, rowIndex, record as Record<string, unknown>))}
+                                {colVirtualizer.getVirtualItems().map(virtualCol => {
+                                    return renderBodyCell(virtualCol, rowIndex, record as Record<string, unknown>)
+                                })}
                             </div>
                         );
                     })}

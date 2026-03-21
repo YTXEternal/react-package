@@ -1,6 +1,7 @@
 import { processCopy, processPasteParse, processPaste, processDelete } from './workerLogic';
+import type { WorkerPayload } from './types';
 
-self.onmessage = (e: MessageEvent) => {
+self.onmessage = (e: MessageEvent<{ id: string; payload: WorkerPayload }>) => {
     const { id, payload } = e.data;
     const { type, data } = payload;
 

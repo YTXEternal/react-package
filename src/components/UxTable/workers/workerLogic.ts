@@ -1,6 +1,8 @@
+import type { CopyPayloadData, DeletePayloadData, PastePayloadData } from './types';
+
 export const processCopy = (
-    selectedData: Record<string, unknown>[], 
-    columns: { key?: string | number | symbol; dataIndex: string | number | symbol }[]
+    selectedData: CopyPayloadData['selectedData'],
+    columns: CopyPayloadData['columns']
 ) => {
     const rows: string[] = [];
     for (let i = 0; i < selectedData.length; i++) {
@@ -19,10 +21,10 @@ export const processCopy = (
 };
 
 export const processDelete = (
-    finalData: Record<string, unknown>[],
-    sortedData: Record<string, unknown>[],
-    columns: { editable?: boolean; dataIndex: string | number | symbol; key?: string | number | symbol }[],
-    bounds: { top: number; bottom: number; left: number; right: number }
+    finalData: DeletePayloadData['finalData'],
+    sortedData: DeletePayloadData['sortedData'],
+    columns: DeletePayloadData['columns'],
+    bounds: DeletePayloadData['bounds']
 ) => {
     const newData = [...finalData];
     let changed = false;
@@ -53,13 +55,13 @@ export const processPasteParse = (text: string) => {
 };
 
 export const processPaste = (
-    text: string,
-    finalData: Record<string, unknown>[],
-    sortedData: Record<string, unknown>[],
-    columns: { editable?: boolean; dataIndex: string | number | symbol; key?: string | number | symbol }[],
-    startRow: number,
-    startCol: number,
-    cutBounds?: { top: number; bottom: number; left: number; right: number } | null
+    text: PastePayloadData['text'],
+    finalData: PastePayloadData['finalData'],
+    sortedData: PastePayloadData['sortedData'],
+    columns: PastePayloadData['columns'],
+    startRow: PastePayloadData['startRow'],
+    startCol: PastePayloadData['startCol'],
+    cutBounds?: PastePayloadData['cutBounds']
 ) => {
     const parsedRows = processPasteParse(text);
     if (!parsedRows || parsedRows.length === 0) {

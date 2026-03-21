@@ -1,13 +1,9 @@
 import { useState, useEffect, useRef } from 'react';
+import type { SelectionState, UseSelectionReturn } from './types';
 
-export interface SelectionState {
-    start: { row: number; col: number };
-    end: { row: number; col: number };
-}
-
-export const useSelection = (tableRef: React.RefObject<HTMLDivElement | null>) => {
+export const useSelection = (tableRef: React.RefObject<HTMLDivElement | null>): UseSelectionReturn => {
     const [selection, setSelection] = useState<SelectionState | null>(null);
-    const isSelecting = useRef(false);
+    const isSelecting = useRef<boolean>(false);
 
     const setIsSelecting = (value: boolean) => {
         isSelecting.current = value;
@@ -62,7 +58,6 @@ export const useSelection = (tableRef: React.RefObject<HTMLDivElement | null>) =
         }
     };
 
-
     /**
      * 选中列
      *
@@ -79,8 +74,6 @@ export const useSelection = (tableRef: React.RefObject<HTMLDivElement | null>) =
         });
         tableRef.current?.focus();
     };
-
-
 
     /**
      * 

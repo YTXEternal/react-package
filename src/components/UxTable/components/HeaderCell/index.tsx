@@ -1,23 +1,7 @@
 import React, { memo } from 'react';
-import type { UxTableColumn } from '../types';
+import type { HeaderCellProps } from './types';
 
-interface HeaderCellProps<DataSource extends unknown[]> {
-    index: number;
-    column: UxTableColumn<DataSource[number]>;
-    virtualStart: number;
-    virtualSize: number;
-    isFixed: 'left' | 'right' | false | undefined;
-    offset: { left?: number; right?: number; isLastLeft?: boolean; isFirstRight?: boolean } | undefined;
-    sortOrder: 'asc' | 'desc' | undefined;
-    isSorted: boolean;
-    dataLength: number;
-    handleColHeaderMouseDown: (e: React.MouseEvent, index: number, dataLength: number) => void;
-    handleColHeaderMouseEnter: (index: number, dataLength: number) => void;
-    handleSort: (index: number) => void;
-    handleResizeMouseDown: (e: React.MouseEvent, index: number) => void;
-}
-
-const HeaderCellInner = <DataSource extends unknown[]>({
+const HeaderCellInner = <RecordType,>({
     index,
     column,
     virtualStart,
@@ -31,7 +15,7 @@ const HeaderCellInner = <DataSource extends unknown[]>({
     handleColHeaderMouseEnter,
     handleSort,
     handleResizeMouseDown
-}: HeaderCellProps<DataSource>) => {
+}: HeaderCellProps<RecordType>) => {
     const key = column.key || String(column.dataIndex) || index;
 
     return (

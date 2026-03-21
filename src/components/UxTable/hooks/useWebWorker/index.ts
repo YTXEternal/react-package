@@ -1,12 +1,11 @@
 import { useEffect, useRef, useCallback } from 'react';
-
-type WorkerFallback<T, R> = (payload: T) => Promise<R> | R;
+import type { WorkerFallback, UseWebWorkerReturn } from './types';
 
 export const useWebWorker = <T, R>(
     workerScript: () => Worker | null,
     fallback: WorkerFallback<T, R>,
     isWorker: boolean = true
-) => {
+): UseWebWorkerReturn<T, R> => {
     const workerRef = useRef<Worker | null>(null);
     const callbacksRef = useRef<Map<string, { resolve: (val: R) => void, reject: (err: unknown) => void }>>(new Map());
 

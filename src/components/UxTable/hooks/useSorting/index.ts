@@ -1,16 +1,12 @@
 import { useState, useMemo } from 'react';
-import type { UxTableColumn } from '../types';
-import { compareValues } from '../utils/sort';
-
-export interface SortState {
-    colIndex: number;
-    order: 'asc' | 'desc';
-}
+import type { UxTableColumn } from '../../types';
+import { compareValues } from '../../utils/sort';
+import type { SortState, UseSortingReturn } from './types';
 
 export const useSorting = <DataSource extends unknown[]>(
     data: DataSource,
     columns: UxTableColumn<DataSource[number]>[]
-) => {
+): UseSortingReturn<DataSource> => {
     const [sortState, setSortState] = useState<SortState | null>(null);
 
     const handleSort = (index: number) => {
@@ -29,7 +25,7 @@ export const useSorting = <DataSource extends unknown[]>(
     const sortedData = useMemo(() => {
         if (!sortState) return data;
         const column = columns[sortState.colIndex];
-        if (!column.sorter) return data;
+        if (!column.sorter || !column.dataIndex) return data;
         
         const dataCopy = [...data] as DataSource;
         dataCopy.sort((a, b) => {
@@ -46,7 +42,7 @@ export const useSorting = <DataSource extends unknown[]>(
 
             let result = 0;
             if (typeof column.sorter === 'function') {
-                result = column.sorter(a as DataSource[number], b as DataSource[number]);
+                result = column.sorter(a, b);
             } else {
                 result = compareValues(valA, valB);
             }
