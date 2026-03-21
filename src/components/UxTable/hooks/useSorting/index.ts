@@ -45,12 +45,12 @@ export const useSorting = <DataSource extends unknown[]>(
         if (!sortState) return data;
         const column = columns[sortState.colIndex];
         if (!column.sorter || !column.dataIndex) return data;
-        
+
         const dataCopy = [...data] as DataSource;
         dataCopy.sort((a, b) => {
             const valA = (a as Record<string, unknown>)[column.dataIndex as string];
             const valB = (b as Record<string, unknown>)[column.dataIndex as string];
-            
+
             // 提取空值判断：空值（null/undefined/空字符串）始终置于末尾
             const isNullA = valA === null || valA === undefined || valA === '';
             const isNullB = valB === null || valB === undefined || valB === '';
@@ -65,7 +65,7 @@ export const useSorting = <DataSource extends unknown[]>(
             } else {
                 result = compareValues(valA, valB);
             }
-            
+
             return sortState.order === 'asc' ? result : -result;
         });
         return dataCopy;

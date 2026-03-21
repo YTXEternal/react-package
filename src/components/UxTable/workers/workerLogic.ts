@@ -151,7 +151,7 @@ export const processPaste = (
             newRecord[column.dataIndex as string] = cellStr;
             changed = true;
         });
-        
+
         newData[originalIndex] = newRecord;
     });
 

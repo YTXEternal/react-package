@@ -22,12 +22,12 @@ export const Header = <RecordType,>({
                     const key = column.key || String(column.dataIndex) || index;
                     const isFixed = column.fixed;
                     const offset = fixedOffsets[index];
-                    
+
                     return (
-                        <th 
-                            key={key} 
+                        <th
+                            key={key}
                             onClick={() => onSort(index)}
-                            style={{ 
+                            style={{
                                 width: column.width,
                                 position: isFixed ? 'sticky' : 'relative',
                                 left: isFixed === 'left' ? offset?.left : undefined,

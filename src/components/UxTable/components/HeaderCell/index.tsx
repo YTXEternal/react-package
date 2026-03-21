@@ -1,4 +1,5 @@
 import React, { memo } from 'react';
+import styles from '../../styles.module.css';
 import type { HeaderCellProps } from './types';
 
 /**
@@ -26,31 +27,31 @@ const HeaderCellInner = <RecordType,>({
     // 确定列的唯一键值
     const key = column.key || String(column.dataIndex) || index;
 
+    /**
+     * 计算表头单元格的 className 组合
+     */
+    const classNames = [
+        styles['ux-table-cell'],
+        styles['ux-table-header-cell'],
+        isFixed ? styles['ux-table-cell-fixed'] : styles['ux-table-cell-absolute'],
+        offset?.isLastLeft ? styles['ux-table-shadow-left'] : '',
+        offset?.isFirstRight ? styles['ux-table-shadow-right'] : ''
+    ].filter(Boolean).join(' ');
+
     return (
         <div
             key={key}
             data-testid={`ux-table-header-cell-${index}`}
+            className={classNames}
             onMouseDown={(e) => handleColHeaderMouseDown(e, index, dataLength)}
             onMouseEnter={() => handleColHeaderMouseEnter(index, dataLength)}
             style={{
-                position: isFixed ? 'sticky' : 'absolute',
                 left: isFixed === 'left' ? offset?.left : undefined,
                 right: isFixed === 'right' ? offset?.right : undefined,
                 transform: isFixed ? undefined : `translateX(${virtualStart}px)`,
                 width: `${virtualSize}px`,
                 height: '100%',
-                zIndex: isFixed ? 4 : 3,
-                backgroundColor: '#fafafa',
-                borderBottom: '1px solid #e8e8e8',
-                borderRight: '1px solid #e8e8e8',
-                boxShadow: offset?.isLastLeft ? '6px 0 6px -4px rgba(0,0,0,0.1)' : (offset?.isFirstRight ? '-6px 0 6px -4px rgba(0,0,0,0.1)' : 'none'),
-                padding: '8px 16px',
-                boxSizing: 'border-box',
-                textAlign: 'left',
-                userSelect: 'none',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between'
+                zIndex: isFixed ? 4 : 3
             }}
         >
             <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>

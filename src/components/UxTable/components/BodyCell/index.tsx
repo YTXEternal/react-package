@@ -44,30 +44,42 @@ const BodyCellInner = <RecordType,>({
     const colKey = column.key || String(column.dataIndex) || colIndex;
 
     /**
-     * 构建单元格的 box-shadow 样式
-     * 用于显示选区的高亮边框（内阴影）以及固定列的边缘阴影
-     * @returns {string} 构建好的 box-shadow 字符串
+     * 计算单元格的 className 组合
      */
-    const buildBoxShadow = () => {
-        let shadow = '';
-        // 如果处于选区边缘，则添加对应的蓝色内阴影边框
-        if (isSelected && selectionBounds?.top === rowIndex) shadow += 'inset 0 2px 0 0 #1890ff, ';
-        if (isSelected && selectionBounds?.bottom === rowIndex) shadow += 'inset 0 -2px 0 0 #1890ff, ';
-        if (isSelected && selectionBounds?.left === colIndex) shadow += 'inset 2px 0 0 0 #1890ff, ';
-        if (isSelected && selectionBounds?.right === colIndex) shadow += 'inset -2px 0 0 0 #1890ff, ';
-        // 如果是活动单元格且不是单格选区，则添加全包围蓝色内阴影
-        if (isActive && (!selectionBounds || (selectionBounds.top === selectionBounds.bottom && selectionBounds.left === selectionBounds.right))) shadow += 'inset 0 0 0 2px #1890ff, ';
-        // 处理固定列的边缘阴影
-        if (offset?.isLastLeft) shadow += '6px 0 6px -4px rgba(0,0,0,0.1), ';
-        if (offset?.isFirstRight) shadow += '-6px 0 6px -4px rgba(0,0,0,0.1), ';
-        
-        return shadow ? shadow.slice(0, -2) : 'none';
-    };
+    const classNames = [
+        styles['ux-table-cell'],
+        styles['ux-table-body-cell'],
+        isFixed ? styles['ux-table-cell-fixed'] : styles['ux-table-cell-absolute'],
+        isSelected ? styles['ux-table-cell-selected'] : '',
+        isActive ? styles['ux-table-cell-active'] : '',
+        offset?.isLastLeft ? styles['ux-table-shadow-left'] : '',
+        offset?.isFirstRight ? styles['ux-table-shadow-right'] : '',
+        isSelected || isActive ? styles['ux-table-selection-border'] : '',
+        isCut ? styles['ux-table-cell-cut'] : ''
+    ].filter(Boolean).join(' ');
+
+    /**
+     * 计算选区边框内阴影变量
+     */
+    const borderVars = {} as React.CSSProperties & Record<string, string>;
+    if (isSelected || isActive) {
+        if (isSelected && selectionBounds?.top === rowIndex) borderVars['--sel-top'] = '2px';
+        if (isSelected && selectionBounds?.bottom === rowIndex) borderVars['--sel-bottom'] = '-2px';
+        if (isSelected && selectionBounds?.left === colIndex) borderVars['--sel-left'] = '2px';
+        if (isSelected && selectionBounds?.right === colIndex) borderVars['--sel-right'] = '-2px';
+        if (isActive && (!selectionBounds || (selectionBounds.top === selectionBounds.bottom && selectionBounds.left === selectionBounds.right))) {
+            borderVars['--sel-top'] = '2px';
+            borderVars['--sel-bottom'] = '-2px';
+            borderVars['--sel-left'] = '2px';
+            borderVars['--sel-right'] = '-2px';
+        }
+    }
 
     return (
         <div
             key={colKey}
             data-testid={`ux-table-cell-${rowIndex}-${colIndex}`}
+            className={classNames}
             onMouseDown={(e) => handleCellMouseDown(e, rowIndex, colIndex, columnsLength, isLineNumberCol)}
             onMouseEnter={() => handleCellMouseEnter(rowIndex, colIndex, columnsLength, isLineNumberCol || isRowSelectionMode)}
             onDoubleClick={() => {
@@ -76,26 +88,15 @@ const BodyCellInner = <RecordType,>({
                 }
             }}
             style={{
-                position: isFixed ? 'sticky' : 'absolute',
                 left: isFixed === 'left' ? offset?.left : undefined,
                 right: isFixed === 'right' ? offset?.right : undefined,
                 transform: isFixed ? undefined : `translateX(${virtualStart}px)`,
                 width: `${virtualSize}px`,
                 height: '100%',
                 zIndex: isFixed ? (isActive ? 6 : (isSelected ? 5 : 4)) : (isActive ? 3 : (isSelected ? 2 : 1)),
-                backgroundColor: isSelected ? (isActive ? '#ffffff' : '#e6f7ff') : '#ffffff',
-                borderBottom: '1px solid #e8e8e8',
-                borderRight: '1px solid #e8e8e8',
-                boxShadow: buildBoxShadow(),
                 padding: isEditing || isLineNumberCol ? 0 : '8px 16px',
-                boxSizing: 'border-box',
                 overflow: isEditing ? 'visible' : 'hidden',
-                textOverflow: 'ellipsis',
-                whiteSpace: 'nowrap',
-                cursor: 'cell',
-                display: 'flex',
-                alignItems: 'center',
-                opacity: isCut ? 0.5 : 1
+                ...borderVars
             }}
         >
             {/* 渲染复制/剪切操作时的蚂蚁线效果 */}

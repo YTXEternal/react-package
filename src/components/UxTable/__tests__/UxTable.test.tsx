@@ -1,4 +1,4 @@
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, act } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import '@testing-library/jest-dom';
 import { UxTable } from '../index';
@@ -22,11 +22,11 @@ jest.mock('@tanstack/react-virtual', () => ({
           size,
           end: (index + 1) * size,
           key: index,
-          measureElement: () => {},
+          measureElement: () => { },
         }));
       },
       getTotalSize: () => count * (horizontal ? 100 : 40),
-      measure: () => {},
+      measure: () => { },
     };
   }),
   defaultRangeExtractor: jest.fn((range) => {
@@ -34,7 +34,7 @@ jest.mock('@tanstack/react-virtual', () => ({
     const end = Math.min(range.count - 1, range.endIndex + range.overscan);
     const arr = [];
     for (let i = start; i <= end; i++) {
-        arr.push(i);
+      arr.push(i);
     }
     return arr;
   })
@@ -75,14 +75,14 @@ describe('UxTable 组件', () => {
 
   it('正确渲染表头', () => {
     render(<UxTable columns={columns} data={data} rowKey="key" />);
-    
+
     expect(screen.getByText('Name')).toBeInTheDocument();
     expect(screen.getByText('Age')).toBeInTheDocument();
   });
 
   it('正确渲染表格数据', () => {
     render(<UxTable columns={columns} data={data} rowKey="key" />);
-    
+
     expect(screen.getByText('John Doe')).toBeInTheDocument();
     expect(screen.getByText('Jane Doe')).toBeInTheDocument();
     expect(screen.getByText('30')).toBeInTheDocument();
@@ -94,7 +94,7 @@ describe('UxTable 组件', () => {
     const testData = [{ key: '1', name: 'John Doe' }] as DataType[];
     // lineShow = false to match original grid testing layout exactly
     render(<UxTable columns={columns} data={testData} rowKey="key" gridConfig={gridConfig} lineShow={false} />);
-    
+
     // The test mock virtualizer renders all items
     // If target cols is 3, columns length becomes 3 (1, 2, 3)
     expect(screen.getByText('3')).toBeInTheDocument();
@@ -103,62 +103,63 @@ describe('UxTable 组件', () => {
   it('当按下 Ctrl+A 时全选所有单元格', async () => {
     const user = userEvent.setup();
     render(<UxTable columns={columns} data={data} rowKey="key" isWorker={false} />);
-    
+
     // First col is line number, start with second col
     const cell01 = screen.getByTestId('ux-table-cell-0-1');
-    
+
     // Select cell
     await user.click(cell01);
-    
+
     // Press Ctrl+A
     fireEvent.keyDown(cell01, { key: 'a', ctrlKey: true });
-    
+
     // Both data cells in the row should be selected (having blue background style)
     // Note: since lineShow=true, columns count is 3. The 3rd column index is 2
     const cell02 = screen.getByTestId('ux-table-cell-0-2');
-    
-    // active cell is white
-    expect(cell01).toHaveStyle('background-color: #e6f7ff'); 
+
+    // In our implementation, handleSelectAll doesn't set isActive to the first cell, 
+    // it just selects all cells (r1=0, c1=0, r2=max, c2=max)
+    expect(cell01.className).toContain('ux-table-cell-selected');
     // selected cell is light blue
-    expect(cell02).toHaveStyle('background-color: #e6f7ff'); 
+    expect(cell02.className).toContain('ux-table-cell-selected');
   });
 
   it('点击表头时选中整列', async () => {
     const user = userEvent.setup();
     render(<UxTable columns={columns} data={data} rowKey="key" />);
-    
+
     // First col is line number, we can select the second col (Name)
     const headerCell = screen.getByTestId('ux-table-header-cell-1');
-    
+
     // Select column
     await user.click(headerCell);
-    
+
     // The entire column should be selected
     const cell01 = screen.getByTestId('ux-table-cell-0-1');
     const cell11 = screen.getByTestId('ux-table-cell-1-1');
-    
-    expect(cell01).toHaveStyle({ backgroundColor: '#ffffff' }); // First cell might be active if it's the start
-    expect(cell11).toHaveStyle({ backgroundColor: '#e6f7ff' });
+
+    expect(cell01.className).toContain('ux-table-cell-selected'); // First cell might be active if it's the start
+    expect(cell11.className).toContain('ux-table-cell-selected');
   });
 
   it('点击行号单元格时选中整行', async () => {
     const user = userEvent.setup();
     render(<UxTable columns={columns} data={data} rowKey="key" lineShow={true} />);
-    
+
     // cell-0-0 is the line number cell for the first row
     const lineNumCell = screen.getByTestId('ux-table-cell-0-0');
-    
+
     // Select row
     await user.click(lineNumCell);
-    
+
     // The entire row should be selected
     const cell01 = screen.getByTestId('ux-table-cell-0-1');
     const cell02 = screen.getByTestId('ux-table-cell-0-2');
-    
+
     // first cell in the selection (active) is white, others are light blue
-    expect(lineNumCell).toHaveStyle('background-color: #ffffff'); 
-    expect(cell01).toHaveStyle('background-color: #e6f7ff');
-    expect(cell02).toHaveStyle('background-color: #e6f7ff');
+    expect(lineNumCell.className).toContain('ux-table-cell-active');
+    expect(cell01.className).toContain('ux-table-cell-selected');
+    expect(cell02.className).toContain('ux-table-cell-selected');
   });
 
   it('仅当点击排序图标时触发排序', async () => {
@@ -168,10 +169,10 @@ describe('UxTable 组件', () => {
     const user = userEvent.setup();
     // Use lineShow={false} to simplify indices for this test
     render(<UxTable columns={sortableColumns} data={data} rowKey="key" lineShow={false} />);
-    
+
     const headerCell = screen.getByTestId('ux-table-header-cell-0');
     const sortIcon = screen.getByTestId('ux-table-sorter-0');
-    
+
     // Clicking header cell shouldn't sort (order should remain original: John Doe first)
     await user.click(headerCell);
     expect(screen.getByTestId('ux-table-cell-0-0')).toHaveTextContent('John Doe');
@@ -183,7 +184,7 @@ describe('UxTable 组件', () => {
 
   it('提供 infinite 属性时扩充行和列', () => {
     const infinite = { row: 5, col: 5, gap: 2 };
-    
+
     // We start with 2 data rows. Target rows = 2.
     // getVirtualItems renders up to 5 items.
     // Render 1: count=2, lastRowIndex=1. 1 + 2 >= 1 -> expands by 5.
@@ -192,9 +193,9 @@ describe('UxTable 组件', () => {
     // Target columns: initial is 2 + lineShow = 3.
     // Render 1: count=3, lastColIndex=2. 2 + 2 >= 2 -> expands by 5.
     // Render 2: count=8, lastColIndex=4. 4 + 2 >= 7 -> stops expanding.
-    
+
     render(<UxTable columns={columns} data={data} rowKey="key" infinite={infinite} />);
-    
+
     // Check if new columns are added (since count=8, but renderCount=5)
     // The columns are named by index + 1 (e.g. '4', '5' because indices are 3, 4)
     // Column indices: 0(lineShow), 1(Name), 2(Age), 3(4), 4(5)
@@ -204,9 +205,9 @@ describe('UxTable 组件', () => {
 
   it('提供 infinite.headerText 时格式化表头文本', () => {
     const infinite = { row: 5, col: 5, gap: 2, headerText: (index: number) => `Col ${index}` };
-    
+
     render(<UxTable columns={columns} data={data} rowKey="key" infinite={infinite} />);
-    
+
     // Column indices: 0(lineShow), 1(Name), 2(Age), 3(Col 3), 4(Col 4)
     expect(screen.getByText('Col 3')).toBeInTheDocument();
     expect(screen.getByText('Col 4')).toBeInTheDocument();
@@ -215,23 +216,23 @@ describe('UxTable 组件', () => {
   describe('带蚂蚁线动画的复制功能', () => {
     it('复制单元格时显示蚂蚁线动画并排除行号列', async () => {
       const user = userEvent.setup();
-      
+
       // Setup document execCommand mock
       const originalExecCommand = document.execCommand;
       document.execCommand = jest.fn();
-      
+
       render(<UxTable columns={columns} data={data} rowKey="key" lineShow={true} isWorker={false} />);
-      
+
       // Select the entire row using line number cell
       const lineNumCell = screen.getByTestId('ux-table-cell-0-0');
       await user.click(lineNumCell);
-      
+
       // Press Ctrl+C to copy
       fireEvent.keyDown(lineNumCell, { key: 'c', ctrlKey: true });
-      
+
       // The component internally uses useClipboard hook which we should ideally mock, 
       // but testing the marching ants animation is sufficient here to verify the copy triggered.
-      
+
       // Verify animation is triggered on data cell
       const cell01 = screen.getByTestId('ux-table-cell-0-1');
       const children = Array.from(cell01.children);
@@ -245,25 +246,25 @@ describe('UxTable 组件', () => {
     it('按下 Escape 键时清除蚂蚁线动画', async () => {
       const user = userEvent.setup();
       const { container } = render(<UxTable columns={columns} data={data} rowKey="key" />);
-      
+
       const cell01 = screen.getByTestId('ux-table-cell-0-1');
       const tableMain = container.querySelector('.ux-table-main');
-      
+
       // Select cell
       await user.click(cell01);
-      
+
       // Copy
       fireEvent.keyDown(cell01, { key: 'c', ctrlKey: true });
-      
+
       // Verify ants are there
       let cellElement = screen.getByTestId('ux-table-cell-0-1');
       expect(Array.from(cellElement.children).some(el => el.className.includes('marching-ants-top'))).toBe(true);
-      
+
       // Press Escape
       if (tableMain) {
-          fireEvent.keyDown(tableMain, { key: 'Escape' });
+        fireEvent.keyDown(tableMain, { key: 'Escape' });
       }
-      
+
       // Verify ants are gone
       cellElement = screen.getByTestId('ux-table-cell-0-1');
       expect(Array.from(cellElement.children).some(el => el.className.includes('marching-ants-top'))).toBe(false);
@@ -272,22 +273,22 @@ describe('UxTable 组件', () => {
     it('进入编辑模式时清除蚂蚁线动画', async () => {
       const user = userEvent.setup();
       render(<UxTable columns={columns} data={data} rowKey="key" />);
-      
+
       const cell01 = screen.getByTestId('ux-table-cell-0-1');
-      
+
       // Select cell
       await user.click(cell01);
-      
+
       // Copy
       fireEvent.keyDown(cell01, { key: 'c', ctrlKey: true });
-      
+
       // Verify ants are there
       let cellElement = screen.getByTestId('ux-table-cell-0-1');
       expect(Array.from(cellElement.children).some(el => el.className.includes('marching-ants-top'))).toBe(true);
-      
+
       // Double click to edit
       await user.dblClick(cell01);
-      
+
       // Verify ants are gone
       cellElement = screen.getByTestId('ux-table-cell-0-1');
       expect(Array.from(cellElement.children).some(el => el.className.includes('marching-ants-top'))).toBe(false);
@@ -297,18 +298,18 @@ describe('UxTable 组件', () => {
       const user = userEvent.setup();
       const beforeCopy = jest.fn().mockResolvedValue(false); // 第一次阻止
       const afterCopy = jest.fn();
-      
+
       const originalExecCommand = document.execCommand;
       document.execCommand = jest.fn();
 
       const { rerender } = render(<UxTable columns={columns} data={data} rowKey="key" lineShow={false} isWorker={false} beforeCopy={beforeCopy} afterCopy={afterCopy} />);
-      
+
       const cell00 = screen.getByTestId('ux-table-cell-0-0');
       await user.click(cell00);
-      
+
       // Copy
       fireEvent.keyDown(cell00, { key: 'c', ctrlKey: true });
-      
+
       await new Promise(resolve => setTimeout(resolve, 0)); // 等待异步
       expect(beforeCopy).toHaveBeenCalledTimes(1);
       expect(afterCopy).not.toHaveBeenCalled(); // 复制被阻止
@@ -316,9 +317,9 @@ describe('UxTable 组件', () => {
       // 修改 mock 允许复制
       beforeCopy.mockResolvedValue(true);
       rerender(<UxTable columns={columns} data={data} rowKey="key" lineShow={false} isWorker={false} beforeCopy={beforeCopy} afterCopy={afterCopy} />);
-      
+
       fireEvent.keyDown(cell00, { key: 'c', ctrlKey: true });
-      
+
       await new Promise(resolve => setTimeout(resolve, 0)); // 等待异步
       expect(beforeCopy).toHaveBeenCalledTimes(2);
       expect(afterCopy).toHaveBeenCalledTimes(1); // 复制成功触发
@@ -330,25 +331,25 @@ describe('UxTable 组件', () => {
   describe('剪切功能', () => {
     it('剪切单元格时显示蚂蚁线动画和 0.5 的不透明度', async () => {
       const user = userEvent.setup();
-      
+
       // Setup document execCommand mock
       const originalExecCommand = document.execCommand;
       document.execCommand = jest.fn();
-      
+
       render(<UxTable columns={columns} data={data} rowKey="key" lineShow={true} isWorker={false} />);
-      
+
       const lineNumCell = screen.getByTestId('ux-table-cell-0-0');
       await user.click(lineNumCell);
-      
+
       // Press Ctrl+X to cut
       fireEvent.keyDown(lineNumCell, { key: 'x', ctrlKey: true });
-      
+
       // Verify animation and opacity is applied on data cell
       const cell01 = screen.getByTestId('ux-table-cell-0-1');
       const children = Array.from(cell01.children);
       const hasTopAnts = children.some(el => el.className.includes('marching-ants-top'));
       expect(hasTopAnts).toBe(true);
-      expect(cell01).toHaveStyle('opacity: 0.5');
+      expect(cell01.className).toContain('ux-table-cell-cut');
 
       // Restore
       document.execCommand = originalExecCommand;
@@ -357,28 +358,28 @@ describe('UxTable 组件', () => {
     it('按下 Escape 键时清除剪切动画', async () => {
       const user = userEvent.setup();
       const { container } = render(<UxTable columns={columns} data={data} rowKey="key" />);
-      
+
       const cell01 = screen.getByTestId('ux-table-cell-0-1');
       const tableMain = container.querySelector('.ux-table-main');
-      
+
       // Select cell
       await user.click(cell01);
-      
+
       // Cut
       fireEvent.keyDown(cell01, { key: 'x', ctrlKey: true });
-      
+
       let cellElement = screen.getByTestId('ux-table-cell-0-1');
-      expect(cellElement).toHaveStyle('opacity: 0.5');
-      
+      expect(cellElement.className).toContain('ux-table-cell-cut');
+
       // Press Escape
       if (tableMain) {
-          fireEvent.keyDown(tableMain, { key: 'Escape' });
+        fireEvent.keyDown(tableMain, { key: 'Escape' });
       }
-      
+
       // Verify ants are gone and opacity is 1
       cellElement = screen.getByTestId('ux-table-cell-0-1');
       expect(Array.from(cellElement.children).some(el => el.className.includes('marching-ants-top'))).toBe(false);
-      expect(cellElement).toHaveStyle('opacity: 1');
+      expect(cellElement.className).not.toContain('ux-table-cell-cut');
     });
   });
 
@@ -386,22 +387,22 @@ describe('UxTable 组件', () => {
     it('按下 Delete 键时清除选中单元格数据并调用 onDataChange', async () => {
       const user = userEvent.setup();
       const onDataChange = jest.fn();
-      
+
       render(<UxTable columns={columns} data={data} rowKey="key" onDataChange={onDataChange} isWorker={false} />);
-      
+
       const cell01 = screen.getByTestId('ux-table-cell-0-1'); // John Doe
-      
+
       // Select cell
       await user.click(cell01);
-      
+
       // Press Delete
       fireEvent.keyDown(cell01, { key: 'Delete' });
-      
+
       // Need to wait for postWorkerMessage fallback to resolve
       await new Promise(resolve => setTimeout(resolve, 0));
 
       expect(onDataChange).toHaveBeenCalledTimes(1);
-      
+
       // The expected data should have 'name' as null for the first row
       const calledData = onDataChange.mock.calls[0][0];
       expect(calledData[0].name).toBeNull();
@@ -414,22 +415,22 @@ describe('UxTable 组件', () => {
       const user = userEvent.setup();
       const onDataChange = jest.fn();
       const { container } = render(<UxTable columns={columns} data={data} rowKey="key" onDataChange={onDataChange} isWorker={false} />);
-      
+
       const cell01 = screen.getByTestId('ux-table-cell-0-1');
       await user.click(cell01);
 
       const tableMain = container.querySelector('.ux-table-main');
-      
+
       // Simulate paste event
       const pasteEvent = new Event('paste', { bubbles: true, cancelable: true });
       Object.defineProperty(pasteEvent, 'clipboardData', {
         value: { getData: jest.fn().mockReturnValue('New John\t35') }
       });
-      
+
       if (tableMain) {
         fireEvent(tableMain, pasteEvent);
       }
-      
+
       // Wait for async worker fallback
       await new Promise(resolve => setTimeout(resolve, 0));
 
@@ -448,21 +449,21 @@ describe('UxTable 组件', () => {
       ];
 
       const { container } = render(<UxTable columns={readonlyColumns} data={data} rowKey="key" onDataChange={onDataChange} isWorker={false} />);
-      
+
       const cell01 = screen.getByTestId('ux-table-cell-0-1');
       await user.click(cell01);
 
       const tableMain = container.querySelector('.ux-table-main');
-      
+
       const pasteEvent = new Event('paste', { bubbles: true, cancelable: true });
       Object.defineProperty(pasteEvent, 'clipboardData', {
         value: { getData: jest.fn().mockReturnValue('New John\t35') }
       });
-      
+
       if (tableMain) {
         fireEvent(tableMain, pasteEvent);
       }
-      
+
       await new Promise(resolve => setTimeout(resolve, 0));
 
       expect(onDataChange).toHaveBeenCalledTimes(1);
@@ -478,32 +479,32 @@ describe('UxTable 组件', () => {
       const afterPaste = jest.fn();
 
       const { container, rerender } = render(
-        <UxTable 
-          columns={columns} 
-          data={data} 
-          rowKey="key" 
+        <UxTable
+          columns={columns}
+          data={data}
+          rowKey="key"
           lineShow={false}
-          onDataChange={onDataChange} 
-          isWorker={false} 
-          beforePaste={beforePaste} 
-          afterPaste={afterPaste} 
+          onDataChange={onDataChange}
+          isWorker={false}
+          beforePaste={beforePaste}
+          afterPaste={afterPaste}
         />
       );
-      
+
       const cell00 = screen.getByTestId('ux-table-cell-0-0');
       await user.click(cell00);
 
       const tableMain = container.querySelector('.ux-table-main');
-      
+
       const pasteEvent = new Event('paste', { bubbles: true, cancelable: true });
       Object.defineProperty(pasteEvent, 'clipboardData', {
         value: { getData: jest.fn().mockReturnValue('New John\t35') }
       });
-      
+
       if (tableMain) {
         fireEvent(tableMain, pasteEvent);
       }
-      
+
       await new Promise(resolve => setTimeout(resolve, 0));
 
       expect(beforePaste).toHaveBeenCalledTimes(1);
@@ -513,15 +514,15 @@ describe('UxTable 组件', () => {
       // 允许粘贴
       beforePaste.mockResolvedValue(true);
       rerender(
-        <UxTable 
-          columns={columns} 
-          data={data} 
-          rowKey="key" 
+        <UxTable
+          columns={columns}
+          data={data}
+          rowKey="key"
           lineShow={false}
-          onDataChange={onDataChange} 
-          isWorker={false} 
-          beforePaste={beforePaste} 
-          afterPaste={afterPaste} 
+          onDataChange={onDataChange}
+          isWorker={false}
+          beforePaste={beforePaste}
+          afterPaste={afterPaste}
         />
       );
 
@@ -540,20 +541,25 @@ describe('UxTable 组件', () => {
   describe('拖拽选择', () => {
     it('拖拽时应选中多个单元格', async () => {
       render(<UxTable columns={columns} data={data} rowKey="key" />);
-      
+
       const cell01 = screen.getByTestId('ux-table-cell-0-1');
       const cell12 = screen.getByTestId('ux-table-cell-1-2');
-      
+
       // Start drag on cell01
       fireEvent.mouseDown(cell01);
       // Enter cell12
       fireEvent.mouseEnter(cell12);
-      
+
+      // Allow requestAnimationFrame to flush
+      await act(async () => {
+        await new Promise(resolve => setTimeout(resolve, 50));
+      });
+
       // cell 01, 02, 11, 12 should be selected
-      expect(cell01).toHaveStyle('background-color: #ffffff'); // active
-      expect(screen.getByTestId('ux-table-cell-0-2')).toHaveStyle('background-color: #e6f7ff');
-      expect(screen.getByTestId('ux-table-cell-1-1')).toHaveStyle('background-color: #e6f7ff');
-      expect(cell12).toHaveStyle('background-color: #e6f7ff');
+      expect(cell01.className).toContain('ux-table-cell-active'); // active
+      expect(screen.getByTestId('ux-table-cell-0-2').className).toContain('ux-table-cell-selected');
+      expect(screen.getByTestId('ux-table-cell-1-1').className).toContain('ux-table-cell-selected');
+      expect(cell12.className).toContain('ux-table-cell-selected');
     });
   });
 
@@ -565,10 +571,10 @@ describe('UxTable 组件', () => {
         { title: 'Age', dataIndex: 'age', key: 'age', editable: true }
       ];
       render(<UxTable columns={readonlyColumns} data={data} rowKey="key" />);
-      
+
       const cell01 = screen.getByTestId('ux-table-cell-0-1');
       await user.dblClick(cell01);
-      
+
       // Input should not exist
       expect(cell01.querySelector('input')).not.toBeInTheDocument();
     });
@@ -583,17 +589,17 @@ describe('UxTable 组件', () => {
     it('如果没有选区则复制操作不应执行任何操作', async () => {
       const originalExecCommand = document.execCommand;
       document.execCommand = jest.fn();
-      
+
       const { container } = render(<UxTable columns={columns} data={data} rowKey="key" isWorker={false} />);
       const tableMain = container.querySelector('.ux-table-main');
-      
+
       // Press Ctrl+C without selecting anything
       if (tableMain) {
         fireEvent.keyDown(tableMain, { key: 'c', ctrlKey: true });
       }
-      
+
       expect(document.execCommand).not.toHaveBeenCalled();
-      
+
       document.execCommand = originalExecCommand;
     });
   });

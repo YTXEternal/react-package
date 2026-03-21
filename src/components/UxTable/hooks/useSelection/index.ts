@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import type { SelectionState, UseSelectionReturn } from './types';
 
 /**
@@ -12,6 +12,8 @@ export const useSelection = (tableRef: React.RefObject<HTMLDivElement | null>): 
     const [selection, setSelection] = useState<SelectionState | null>(null);
     // 是否正在进行框选拖拽的标志
     const isSelecting = useRef<boolean>(false);
+    // 节流标志，防止高频触发鼠标移动事件
+    const rafId = useRef<number | null>(null);
 
     /**
      * 设置是否正在进行框选
@@ -19,18 +21,22 @@ export const useSelection = (tableRef: React.RefObject<HTMLDivElement | null>): 
      * @param {boolean} value 是否正在框选
      * @returns {void}
      */
-    const setIsSelecting = (value: boolean) => {
+    const setIsSelecting = useCallback((value: boolean) => {
         isSelecting.current = value;
-    }
+    }, []);
 
     useEffect(() => {
         // 全局鼠标抬起事件处理，结束框选状态
         const handleGlobalMouseUp = () => {
             setIsSelecting(false);
+            if (rafId.current) {
+                cancelAnimationFrame(rafId.current);
+                rafId.current = null;
+            }
         }
         window.addEventListener('mouseup', handleGlobalMouseUp);
         return () => window.removeEventListener('mouseup', handleGlobalMouseUp);
-    }, []);
+    }, [setIsSelecting]);
 
     /**
      * 处理单元格的鼠标按下事件（开始框选或单选）
@@ -42,7 +48,7 @@ export const useSelection = (tableRef: React.RefObject<HTMLDivElement | null>): 
      * @param {boolean} [isLineNumberCol=false] 是否点击了行号列（如果是，则选中整行）
      * @returns {void}
      */
-    const handleCellMouseDown = (e: React.MouseEvent, rowIndex: number, colIndex: number, colCount: number, isLineNumberCol: boolean = false) => {
+    const handleCellMouseDown = useCallback((e: React.MouseEvent, rowIndex: number, colIndex: number, colCount: number, isLineNumberCol: boolean = false) => {
         if (e.button !== 0) return; // 仅响应鼠标左键点击
         setIsSelecting(true);
 
@@ -62,7 +68,7 @@ export const useSelection = (tableRef: React.RefObject<HTMLDivElement | null>): 
         }
         // 聚焦表格以使键盘事件能够生效
         tableRef.current?.focus();
-    };
+    }, [tableRef, setIsSelecting]);
 
     /**
      * 处理单元格的鼠标进入事件（拖拽框选过程中的区域更新）
@@ -73,21 +79,33 @@ export const useSelection = (tableRef: React.RefObject<HTMLDivElement | null>): 
      * @param {boolean} [isLineNumberCol=false] 是否经过了行号列
      * @returns {void}
      */
-    const handleCellMouseEnter = (rowIndex: number, colIndex: number, colCount: number, isLineNumberCol: boolean = false) => {
-        if (isSelecting.current && selection) {
-            if (isLineNumberCol) {
-                setSelection({
-                    ...selection,
-                    end: { row: rowIndex, col: Math.max(0, colCount - 1) }
-                });
-            } else {
-                setSelection({
-                    ...selection,
-                    end: { row: rowIndex, col: colIndex }
-                });
-            }
+    const handleCellMouseEnter = useCallback((rowIndex: number, colIndex: number, colCount: number, isLineNumberCol: boolean = false) => {
+        if (!isSelecting.current) return;
+
+        if (rafId.current) {
+            cancelAnimationFrame(rafId.current);
         }
-    };
+
+        // 使用 requestAnimationFrame 节流，并使用函数式更新解决闭包陷阱
+        rafId.current = requestAnimationFrame(() => {
+            setSelection(prev => {
+                if (!prev) return prev;
+
+                // 检查是否真正发生变化，避免无意义的渲染
+                const newEndRow = rowIndex;
+                const newEndCol = isLineNumberCol ? Math.max(0, colCount - 1) : colIndex;
+
+                if (prev.end.row === newEndRow && prev.end.col === newEndCol) {
+                    return prev;
+                }
+
+                return {
+                    ...prev,
+                    end: { row: newEndRow, col: newEndCol }
+                };
+            });
+        });
+    }, []);
 
     /**
      * 处理列头的鼠标按下事件（选中整列）
@@ -97,7 +115,7 @@ export const useSelection = (tableRef: React.RefObject<HTMLDivElement | null>): 
      * @param {number} rowCount 数据总行数
      * @returns {void}
      */
-    const handleColHeaderMouseDown = (e: React.MouseEvent, colIndex: number, rowCount: number) => {
+    const handleColHeaderMouseDown = useCallback((e: React.MouseEvent, colIndex: number, rowCount: number) => {
         if (e.button !== 0) return; // 仅响应鼠标左键点击
         setIsSelecting(true);
         setSelection({
@@ -105,7 +123,7 @@ export const useSelection = (tableRef: React.RefObject<HTMLDivElement | null>): 
             end: { row: Math.max(0, rowCount - 1), col: colIndex }
         });
         tableRef.current?.focus();
-    };
+    }, [tableRef, setIsSelecting]);
 
     /**
      * 处理列头的鼠标进入事件（拖拽列头进行多列选择）
@@ -114,14 +132,29 @@ export const useSelection = (tableRef: React.RefObject<HTMLDivElement | null>): 
      * @param {number} rowCount 数据总行数
      * @returns {void}
      */
-    const handleColHeaderMouseEnter = (colIndex: number, rowCount: number) => {
-        if (isSelecting.current && selection) {
-            setSelection({
-                ...selection,
-                end: { row: Math.max(0, rowCount - 1), col: colIndex }
-            });
+    const handleColHeaderMouseEnter = useCallback((colIndex: number, rowCount: number) => {
+        if (!isSelecting.current) return;
+
+        if (rafId.current) {
+            cancelAnimationFrame(rafId.current);
         }
-    };
+
+        rafId.current = requestAnimationFrame(() => {
+            setSelection(prev => {
+                if (!prev) return prev;
+
+                const newEndRow = Math.max(0, rowCount - 1);
+                if (prev.end.row === newEndRow && prev.end.col === colIndex) {
+                    return prev;
+                }
+
+                return {
+                    ...prev,
+                    end: { row: newEndRow, col: colIndex }
+                };
+            });
+        });
+    }, []);
 
     /**
      * 判断指定的单元格是否在当前选区内
@@ -130,14 +163,14 @@ export const useSelection = (tableRef: React.RefObject<HTMLDivElement | null>): 
      * @param {number} colIndex 列索引
      * @returns {boolean} 是否被选中
      */
-    const isCellSelected = (rowIndex: number, colIndex: number) => {
+    const isCellSelected = useCallback((rowIndex: number, colIndex: number) => {
         if (!selection) return false;
         const r1 = Math.min(selection.start.row, selection.end.row);
         const r2 = Math.max(selection.start.row, selection.end.row);
         const c1 = Math.min(selection.start.col, selection.end.col);
         const c2 = Math.max(selection.start.col, selection.end.col);
         return rowIndex >= r1 && rowIndex <= r2 && colIndex >= c1 && colIndex <= c2;
-    };
+    }, [selection]);
 
     /**
      * 判断指定的单元格是否为选区的起始活动单元格
@@ -146,10 +179,10 @@ export const useSelection = (tableRef: React.RefObject<HTMLDivElement | null>): 
      * @param {number} colIndex 列索引
      * @returns {boolean} 是否为活动单元格
      */
-    const isCellActive = (rowIndex: number, colIndex: number) => {
+    const isCellActive = useCallback((rowIndex: number, colIndex: number) => {
         if (!selection) return false;
         return selection.start.row === rowIndex && selection.start.col === colIndex;
-    };
+    }, [selection]);
 
     return {
         selection,

@@ -38,7 +38,7 @@ export interface BodyCellProps<RecordType> {
     selectionBounds: { top: number; bottom: number; left: number; right: number } | null;
     /** 是否处于整行选择模式 */
     isRowSelectionMode: boolean;
-    
+
     // Ant properties（复制/剪切时的蚂蚁线效果边界判断）
     /** 是否处于蚂蚁线选区的上边缘 */
     isAntsTop: boolean;
