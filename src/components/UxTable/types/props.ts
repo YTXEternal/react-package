@@ -30,17 +30,28 @@ export interface UxTableColumn<RecordType> {
    */
   editable?: boolean;
   /**
-   * 排序函数，如果存在则表示该列支持排序。
+   * 排序函数或布尔值，为 true 时使用内置的通用排序（支持 string | number | null），为函数时使用自定义排序
    * 返回 > 0 表示 a > b，< 0 表示 a < b，0 表示 a == b
    */
-  sorter?: (a: RecordType, b: RecordType) => number;
+  sorter?: boolean | ((a: RecordType, b: RecordType) => number);
   /**
    * 冻结列
    */
   fixed?: 'left' | 'right';
 }
 
+export interface UxTableRef {
+  /**
+   * 聚焦指定区域
+   */
+  focusArea: (area: { row: [number, number]; cols: [number, number] }) => void;
+}
+
 export interface UxTableProps<DataSource extends unknown[]> {
+  /**
+   * 引用
+   */
+  ref?: React.Ref<UxTableRef>;
   /**
    * 表格列的配置描述
    */
@@ -72,4 +83,48 @@ export interface UxTableProps<DataSource extends unknown[]> {
     rows: number;
     cols: number;
   };
+  /**
+   * 无限滚动配置，在x轴和y轴快要滚动到尽头时（间隔gap列/行的距离），根据row和col扩充表格的行列
+   */
+  infinite?: {
+    row: number;
+    col: number;
+    gap: number;
+    /** 格式化扩充列的表头文本，默认使用当前列索引 + 1 */
+    headerText?: (index: number) => string;
+  };
+  /**
+   * 是否显示行号，默认为 true
+   */
+  lineShow?: boolean;
+  /**
+   * 是否开启 Web Worker 进行耗时任务处理，默认为 true
+   */
+  isWorker?: boolean;
+  /**
+   * 复制前触发，返回 false 或 Promise<false> 可以阻止默认的复制行为
+   * @param params 包含被复制的数据和对应的列信息
+   * @returns 是否允许复制
+   */
+  beforeCopy?: (params: { selectedData: DataSource[number][]; columns: UxTableColumn<DataSource[number]>[] }) => boolean | void | Promise<boolean | void>;
+  /**
+   * 复制后触发
+   * @param params 包含复制的文本内容、被复制的数据和对应的列信息
+   */
+  afterCopy?: (params: { text: string; selectedData: DataSource[number][]; columns: UxTableColumn<DataSource[number]>[] }) => void;
+  /**
+   * 粘贴前触发，返回 false 或 Promise<false> 可以阻止默认的粘贴行为
+   * @param params 包含粘贴的文本内容以及粘贴起始的行列索引
+   * @returns 是否允许粘贴
+   */
+  beforePaste?: (params: { text: string; startRow: number; startCol: number }) => boolean | void | Promise<boolean | void>;
+  /**
+   * 粘贴后触发
+   * @param params 包含粘贴的文本内容、更新后的完整数据、以及粘贴区域的起始和最大行列索引
+   */
+  afterPaste?: (params: { text: string; newData: DataSource; startRow: number; startCol: number; maxRowIdx: number; maxColIdx: number }) => void;
+  /**
+   * 记录多少次操作记录，用于撤销/恢复功能。默认为 5 次。最大上限为 20 次。
+   */
+  recordNum?: number;
 }
