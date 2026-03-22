@@ -1,7 +1,7 @@
 {
   "name": "ux-table-react",
   "private": false,
-  "version": "1.0.0-rc.0",
+  "version": "1.0.0",
   "description": "一个高性能的 React 表格组件，支持虚拟滚动、单元格编辑、列排序和固定列等高级特性，基于 UnoCSS 打造。",
   "keywords": [
     "react",
@@ -16,7 +16,7 @@
     "fixed-columns",
     "high-performance"
   ],
-  "author": "UxTable Team",
+  "author": "ux_rcl",
   "license": "MIT",
   "engines": {
     "node": ">=18.0.0",
@@ -31,12 +31,12 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/ux-table/ux-table-react.git"
+    "url": "https://github.com/YTXEternal/ux-table-react"
   },
   "bugs": {
-    "url": "https://github.com/ux-table/ux-table-react/issues"
+    "url": "https://github.com/YTXEternal/ux-table-react/issues"
   },
-  "homepage": "https://ux-table.github.io/ux-table-react/",
+  "homepage": "https://ytxeternal.github.io/ux-table-react",
   "type": "module",
   "main": "./dist/ux-table-react.umd.js",
   "module": "./dist/ux-table-react.es.js",

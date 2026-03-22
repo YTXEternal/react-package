@@ -5,15 +5,15 @@
 [![TypeScript](https://img.shields.io/badge/TypeScript-Ready-blue.svg)](https://www.typescriptlang.org/)
 [![React](https://img.shields.io/badge/React-18%20%7C%2019-blue.svg)](https://react.dev/)
 
-UX Table React 是一个基于 React 和 UnoCSS 开发的高性能表格组件库。它专为大数据量和复杂交互场景设计，内置了丰富的数据网格（DataGrid）功能，在保持轻量级的同时提供极致的渲染性能。
+UX Table React 是一个基于 React 开发的高性能表格组件库。它专为大数据量和复杂交互场景设计，内置了丰富的数据网格（DataGrid）功能，在保持轻量级的同时提供极致的渲染性能。
 
-## ✨ 核心特性
+## ✨ 简介 (核心特性)
 
 - 🚀 **极致性能**：内置虚拟滚动（Virtual Scrolling）与 Web Worker 数据处理，轻松应对十万级甚至百万级数据渲染。
 - 🛠 **功能丰富**：
-  - **列操作**：支持固定列（左/右）、列宽调整（Resizing）、列排序（Sorting）。
-  - **数据交互**：支持单元格内联编辑（Editing）、行/单元格选中（Selection）、剪贴板复制粘贴（Clipboard）。
-- 🎨 **样式定制**：基于 UnoCSS 构建，提供灵活的样式定制能力，完美适配现代 Web 应用设计。
+  - **列操作**：支持固定列（左/右）、列宽拖拽调整（Resizing）、列排序（Sorting）。
+  - **数据交互**：支持单元格内联编辑（Editing）、行列/多单元格选中（Selection）。
+  - **Excel 级体验**：支持剪贴板带蚂蚁线动画复制粘贴（Clipboard），支持撤销重做（Undo/Redo），按键导航（键盘上下左右、ESC 取消选中、Delete 删除数据等）。
 - 📦 **开箱即用**：零额外配置，支持按需引入，包含完善的类型推导。
 - 🛡️ **TypeScript 支持**：代码库 100% 使用 TypeScript 编写，杜绝 `any`，提供极佳的开发体验。
 
@@ -35,7 +35,9 @@ yarn add ux-table-react
 
 > **注意**：本项目依赖 `react` 和 `react-dom`（>=18.0.0），请确保你的项目中已安装相关对等依赖。
 
-## 🚀 快速上手
+## 🚀 使用文档 (快速上手)
+
+[📖 使用文档](https://ytxeternal.github.io/ux-table-react/)
 
 引入组件及其基础样式文件即可开始使用：
 
@@ -63,7 +65,9 @@ function App() {
       <UxTable 
         columns={columns} 
         data={data} 
-        rowKey="key" 
+        rowKey="key"
+        onDataChange={setData}
+        recordNum={10} // 开启撤销重做功能，记录 10 步历史
       />
     </div>
   );
@@ -72,25 +76,24 @@ function App() {
 export default App;
 ```
 
-## 📖 文档与示例
+### ⚙️ 核心 API 预览
 
-更多详细的 API 文档、高级特性说明（如虚拟滚动、单元格编辑等）和在线交互示例，请访问我们的[官方文档网站](https://ux-table.github.io/ux-table-react/)。
-
-## ⚙️ 核心 API 预览
-
-### UxTable Props
+#### UxTable Props
 
 | 属性 | 说明 | 类型 | 默认值 |
 | --- | --- | --- | --- |
 | `data` | 表格数据数组 | `Record<string, any>[]` | `[]` |
 | `columns` | 表格列配置 | `Column[]` | `[]` |
-| `rowKey` | 表格行 key 的取值字段 | `string` | `'id'` |
-| `width` | 表格宽度 | `number \| string` | `'100%'` |
-| `height` | 表格高度（开启虚拟滚动建议设置） | `number \| string` | `'100%'` |
+| `rowKey` | 表格行 key 的取值字段或函数 | `string \| ((record: any) => string)` | `'id'` |
+| `onDataChange` | 数据变化时的回调 | `(newData: any[]) => void` | - |
+| `recordNum` | 记录多少次操作记录（用于 ctrl+z/ctrl+y 撤销重做） | `number` | `5` (上限20) |
+| `gridConfig` | 网格配置，用于补齐空单元格 | `{ rows: number; cols: number; }` | - |
+| `infinite` | 无限滚动配置 | `{ row: number; col: number; gap: number }` | - |
+| `isWorker` | 是否开启 Web Worker 处理耗时任务（如大数据复制粘贴） | `boolean` | `true` |
 
-*(更多详细 API 请参考官方文档)*
+> 更多详细的 API 文档、高级特性说明（如虚拟滚动、单元格编辑等）和在线交互示例，请访问我们的[官方文档网站](https://ux-table.github.io/ux-table-react/)。
 
-## 👨‍💻 开发指南
+## 👨‍💻 贡献代码
 
 我们非常欢迎你参与到 `ux-table-react` 的开发中来！
 
@@ -127,7 +130,7 @@ pnpm install
 - **代码提交**
   本项目遵循 GitFlow 工作流及 Angular 提交规范。请使用 `pnpm commit` 替代 `git commit`，并确保提交信息**以中文为主**。
 
-## 🤝 贡献代码
+### 提交流程
 
 1. 基于 `master` 切换分支，功能开发使用 `feat/*`，修复使用 `hotfix/*`
 2. 提交您的更改 (`pnpm commit`) - 务必遵守中文为主的提交规范！
