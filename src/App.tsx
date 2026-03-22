@@ -1,4 +1,5 @@
 import DefaultDemo from './demo/defaultDemo'
+import './plugins/style';
 function App() {
   return (
     <div>
