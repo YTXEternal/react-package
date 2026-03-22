@@ -9,6 +9,7 @@ lerna-debug.log*
 
 node_modules
 dist
+dist-example
 dist-ssr
 *.local
 
@@ -28,3 +29,5 @@ docs/.vitepress/cache/*
 
 
 cypress/screenshots/*
+
+

@@ -109,3 +109,121 @@
 .ux-table-scrollbar-x::-webkit-scrollbar {
   height: 12px; /* 横向滚动条高度，略大一些方便点击 */
 }
+
+/* ================= 性能优化：样式抽象 ================= */
+
+/* 基础单元格样式 */
+.ux-table-cell {
+  border-bottom: 1px solid #e8e8e8;
+  border-right: 1px solid #e8e8e8;
+  box-sizing: border-box;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: cell;
+  display: flex;
+  align-items: center;
+}
+
+/* 表头单元格特有样式 */
+.ux-table-header-cell {
+  background-color: #fafafa;
+  padding: 8px 16px;
+  user-select: none;
+  justify-content: space-between;
+}
+
+/* 数据体单元格特有样式 */
+.ux-table-body-cell {
+  background-color: #ffffff;
+}
+
+/* 固定列样式 */
+.ux-table-cell-fixed {
+  position: sticky;
+}
+
+.ux-table-cell-absolute {
+  position: absolute;
+}
+
+/* 选区与状态高亮 */
+.ux-table-cell-selected {
+  background-color: #e6f7ff;
+}
+
+.ux-table-cell-active {
+  background-color: #ffffff;
+}
+
+/* 固定列边缘阴影 */
+.ux-table-shadow-left {
+  box-shadow: 6px 0 6px -4px rgba(0,0,0,0.1);
+}
+
+.ux-table-shadow-right {
+  box-shadow: -6px 0 6px -4px rgba(0,0,0,0.1);
+}
+
+/* 选区边框内阴影 (使用伪元素或特定的 class 组合，这里通过 CSS 变量叠加) */
+.ux-table-selection-border {
+  --sel-top: 0;
+  --sel-right: 0;
+  --sel-bottom: 0;
+  --sel-left: 0;
+  box-shadow: inset var(--sel-left) var(--sel-top) 0 0 #1890ff,
+              inset var(--sel-right) var(--sel-bottom) 0 0 #1890ff;
+}
+
+.ux-table-cell-cut {
+  opacity: 0.5;
+}
+
+/* 蚂蚁线动画（复制功能） */
+@keyframes march-x {
+  0% { background-position: 0 0; }
+  100% { background-position: 8px 0; }
+}
+@keyframes march-x-reverse {
+  0% { background-position: 0 0; }
+  100% { background-position: -8px 0; }
+}
+@keyframes march-y {
+  0% { background-position: 0 0; }
+  100% { background-position: 0 8px; }
+}
+@keyframes march-y-reverse {
+  0% { background-position: 0 0; }
+  100% { background-position: 0 -8px; }
+}
+
+.marching-ants-top {
+  position: absolute;
+  top: 0; left: 0; right: 0; height: 2px;
+  background: repeating-linear-gradient(to right, #1890ff 0, #1890ff 4px, transparent 4px, transparent 8px);
+  animation: march-x 0.5s linear infinite;
+  z-index: 5;
+}
+
+.marching-ants-bottom {
+  position: absolute;
+  bottom: 0; left: 0; right: 0; height: 2px;
+  background: repeating-linear-gradient(to right, #1890ff 0, #1890ff 4px, transparent 4px, transparent 8px);
+  animation: march-x-reverse 0.5s linear infinite;
+  z-index: 5;
+}
+
+.marching-ants-left {
+  position: absolute;
+  top: 0; bottom: 0; left: 0; width: 2px;
+  background: repeating-linear-gradient(to bottom, #1890ff 0, #1890ff 4px, transparent 4px, transparent 8px);
+  animation: march-y-reverse 0.5s linear infinite;
+  z-index: 5;
+}
+
+.marching-ants-right {
+  position: absolute;
+  top: 0; bottom: 0; right: 0; width: 2px;
+  background: repeating-linear-gradient(to bottom, #1890ff 0, #1890ff 4px, transparent 4px, transparent 8px);
+  animation: march-y 0.5s linear infinite;
+  z-index: 5;
+}
