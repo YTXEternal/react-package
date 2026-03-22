@@ -40,10 +40,10 @@
   "type": "module",
   "main": "./dist/ux-table-react.umd.js",
   "module": "./dist/ux-table-react.es.js",
-  "types": "./dist/index.d.ts",
+  "types": "./dist/types/index.d.ts",
   "exports": {
     ".": {
-      "types": "./dist/index.d.ts",
+      "types": "./dist/types/index.d.ts",
       "import": "./dist/ux-table-react.es.js",
       "require": "./dist/ux-table-react.umd.js"
     },

@@ -7,6 +7,7 @@ import { resolve } from 'path'
 
 // https://vite.dev/config/
 export default defineConfig({
+  publicDir: false, // 禁用 public 目录，避免打包时复制 public/images
   resolve: {
     alias: {
       '@': resolve(__dirname, './src')
@@ -18,7 +19,10 @@ export default defineConfig({
     babel({ presets: [reactCompilerPreset()] }),
     dts({
       insertTypesEntry: true,
-      include: ['src/components/**/*.ts', 'src/components/**/*.tsx', 'src/index.ts'],
+      include: ['src'],
+      exclude: ['src/**/*.test.ts', 'src/**/*.test.tsx', 'src/demo/**/*'],
+      outDir: 'dist/types',
+      tsconfigPath: './tsconfig.app.json' // 明确指定 tsconfig，因为项目有多个 tsconfig
     })
   ],
   build: {
@@ -36,7 +40,8 @@ export default defineConfig({
           react: 'React',
           'react-dom': 'ReactDOM',
           'react/jsx-runtime': 'jsxRuntime'
-        }
+        },
+        assetFileNames: 'ux-table-react.[ext]' // 统一 CSS 等静态资源命名
       }
     }
   }

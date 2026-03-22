@@ -79,10 +79,6 @@ function DefaultDemo() {
 
     return (
         <div>
-            {/* <img src='/images/634244.png' alt="" />
-            <img src='/images/634244.png' alt="" />
-            <img src='/images/634244.png' alt="" />
-            <img src='/images/634244.png' alt="" /> */}
             <div style={{ padding: 20, height: '500px', width: '1000px', display: 'flex', flexDirection: 'column' }}>
                 <h1>UxTable</h1>
                 <div style={{ flex: 1, overflow: 'hidden' }}>
